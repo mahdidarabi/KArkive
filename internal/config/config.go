@@ -15,7 +15,7 @@ type Config struct {
 
 const (
 	DefaultBusyBoxImage  = "docker.io/library/busybox:1.37"
-	DefaultGnuPGImage    = "docker.io/instrumentisto/gnupg:2.4"
+	DefaultGnuPGImage    = "docker.io/vladgh/gpg:1.3.11"
 	DefaultPostgresImage = "docker.io/cloudnative-pg/postgresql:18.4"
 	DefaultMcImage       = "docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z"
 	DefaultMariaDBImage  = "docker.io/library/mariadb:10.6"

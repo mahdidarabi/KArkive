@@ -22,7 +22,7 @@ defaults:
   # cleanup + compress (find, gzip)
   busyboxImage: docker.io/library/busybox:1.37
   # encrypt (gpg)
-  gnupgImage: docker.io/instrumentisto/gnupg:2.4
+  gnupgImage: docker.io/vladgh/gpg:1.3.11
   # pgdump only
   postgresImage: docker.io/cloudnative-pg/postgresql:18.4
   mcImage: docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
