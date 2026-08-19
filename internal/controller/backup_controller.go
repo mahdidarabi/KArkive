@@ -62,7 +62,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if !resources.EngineImplemented(backup.Spec.Engine) {
 		engine := resources.EffectiveEngine(backup.Spec.Engine)
-		msg := fmt.Sprintf("engine %q is not implemented yet (phase 1 is postgres backup)", engine)
+		msg := fmt.Sprintf("engine %q is not implemented yet (postgres backup and restore are implemented)", engine)
 		logger.Info(msg)
 		r.Recorder.Event(backup, corev1.EventTypeWarning, "UnsupportedEngine", msg)
 		return ctrl.Result{}, r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseUnsupported, metav1.ConditionFalse, "UnsupportedEngine", msg)

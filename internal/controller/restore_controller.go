@@ -2,30 +2,47 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
+	"github.com/mahdidarabi/Karkive/internal/config"
+	"github.com/mahdidarabi/Karkive/internal/resources"
 )
 
-// RestoreReconciler is a stub: Restore CRs are accepted so the API is stable,
-// but pipeline resources are not created until the restore phase.
+var requiredRestoreSecretKeys = []string{
+	"s3_access_key",
+	"s3_secret_key",
+	"gpg_passphrase",
+}
+
+// RestoreReconciler reconciles a Restore object into ConfigMap + optional PVC + CronJob.
 type RestoreReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+	Config   config.Config
 }
 
-// +kubebuilder:rbac:groups=karkive.io,resources=restores,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=karkive.io,resources=restores,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=karkive.io,resources=restores/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=karkive.io,resources=restores/finalizers,verbs=update
+// +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
 func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -35,24 +52,191 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	msg := "restore reconciliation is not implemented yet; postgres backup ships first"
-	logger.Info(msg, "restore", req.NamespacedName)
-	r.Recorder.Event(restore, corev1.EventTypeNormal, "NotImplemented", msg)
+	if !resources.EngineImplemented(restore.Spec.Engine) {
+		engine := resources.EffectiveEngine(restore.Spec.Engine)
+		msg := fmt.Sprintf("engine %q is not implemented yet (postgres backup and restore are implemented)", engine)
+		logger.Info(msg)
+		r.Recorder.Event(restore, corev1.EventTypeWarning, "UnsupportedEngine", msg)
+		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseUnsupported, metav1.ConditionFalse, "UnsupportedEngine", msg)
+	}
 
-	restore.Status.Phase = karkivev1alpha1.RestorePhaseNotImplemented
+	if err := validateRestoreSpec(restore); err != nil {
+		r.Recorder.Event(restore, corev1.EventTypeWarning, "InvalidSpec", err.Error())
+		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "InvalidSpec", err.Error())
+	}
+
+	if err := r.ensureJobSecret(ctx, restore); err != nil {
+		if apierrors.IsNotFound(err) {
+			msg := fmt.Sprintf("secret %q not found", restore.Spec.SecretRef.Name)
+			r.Recorder.Event(restore, corev1.EventTypeWarning, "SecretNotFound", msg)
+			if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhasePending, metav1.ConditionFalse, "SecretNotFound", msg); statusErr != nil {
+				return ctrl.Result{}, statusErr
+			}
+			return ctrl.Result{RequeueAfter: secretRequeue}, nil
+		}
+		r.Recorder.Event(restore, corev1.EventTypeWarning, "SecretInvalid", err.Error())
+		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "SecretInvalid", err.Error())
+	}
+
+	if err := r.ensurePostgresSecret(ctx, restore); err != nil {
+		if apierrors.IsNotFound(err) {
+			name, _, _ := resources.RestorePostgresSecret(restore)
+			msg := fmt.Sprintf("postgres secret %q not found", name)
+			r.Recorder.Event(restore, corev1.EventTypeWarning, "PostgresSecretNotFound", msg)
+			if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhasePending, metav1.ConditionFalse, "PostgresSecretNotFound", msg); statusErr != nil {
+				return ctrl.Result{}, statusErr
+			}
+			return ctrl.Result{RequeueAfter: secretRequeue}, nil
+		}
+		r.Recorder.Event(restore, corev1.EventTypeWarning, "PostgresSecretInvalid", err.Error())
+		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "PostgresSecretInvalid", err.Error())
+	}
+
+	if err := r.ensureConfigMap(ctx, restore); err != nil {
+		return ctrl.Result{}, r.fail(ctx, restore, "ConfigMapError", err)
+	}
+	if err := r.ensurePVC(ctx, restore); err != nil {
+		return ctrl.Result{}, r.fail(ctx, restore, "PVCError", err)
+	}
+	if err := r.ensureCronJob(ctx, restore); err != nil {
+		return ctrl.Result{}, r.fail(ctx, restore, "CronJobError", err)
+	}
+
+	cron := &batchv1.CronJob{}
+	if err := r.Get(ctx, client.ObjectKey{Namespace: restore.Namespace, Name: resources.RestoreOwnedName(restore)}, cron); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	restore.Status.CronJobName = cron.Name
+	restore.Status.LastScheduleTime = cron.Status.LastScheduleTime
+	restore.Status.LastSuccessfulTime = cron.Status.LastSuccessfulTime
+	msg := fmt.Sprintf("CronJob %s is synced", cron.Name)
+	r.Recorder.Event(restore, corev1.EventTypeNormal, "Synced", msg)
+	return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseReady, metav1.ConditionTrue, "Synced", msg)
+}
+
+func (r *RestoreReconciler) fail(ctx context.Context, restore *karkivev1alpha1.Restore, reason string, err error) error {
+	r.Recorder.Event(restore, corev1.EventTypeWarning, reason, err.Error())
+	if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, reason, err.Error()); statusErr != nil {
+		return statusErr
+	}
+	return err
+}
+
+func validateRestoreSpec(restore *karkivev1alpha1.Restore) error {
+	if restore.Spec.Schedule == "" {
+		return fmt.Errorf("spec.schedule is required")
+	}
+	if restore.Spec.Database.Host == "" {
+		return fmt.Errorf("spec.database.host is required")
+	}
+	if restore.Spec.Database.Name == "" {
+		return fmt.Errorf("spec.database.name is required")
+	}
+	if restore.Spec.S3.Path == "" {
+		return fmt.Errorf("spec.s3.path is required")
+	}
+	if restore.Spec.SecretRef.Name == "" {
+		return fmt.Errorf("spec.secretRef.name is required")
+	}
+	if restore.Spec.PostgresSecret == nil || restore.Spec.PostgresSecret.Name == "" {
+		return fmt.Errorf("spec.postgresSecret.name is required")
+	}
+	return nil
+}
+
+func (r *RestoreReconciler) ensureJobSecret(ctx context.Context, restore *karkivev1alpha1.Restore) error {
+	secret := &corev1.Secret{}
+	key := client.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.SecretRef.Name}
+	if err := r.Get(ctx, key, secret); err != nil {
+		return err
+	}
+	for _, k := range requiredRestoreSecretKeys {
+		if _, ok := secret.Data[k]; !ok {
+			return fmt.Errorf("secret %q is missing key %q", secret.Name, k)
+		}
+	}
+	return nil
+}
+
+func (r *RestoreReconciler) ensurePostgresSecret(ctx context.Context, restore *karkivev1alpha1.Restore) error {
+	name, userKey, passKey := resources.RestorePostgresSecret(restore)
+	secret := &corev1.Secret{}
+	key := client.ObjectKey{Namespace: restore.Namespace, Name: name}
+	if err := r.Get(ctx, key, secret); err != nil {
+		return err
+	}
+	for _, k := range []string{userKey, passKey} {
+		if _, ok := secret.Data[k]; !ok {
+			return fmt.Errorf("postgres secret %q is missing key %q", secret.Name, k)
+		}
+	}
+	return nil
+}
+
+func (r *RestoreReconciler) ensureConfigMap(ctx context.Context, restore *karkivev1alpha1.Restore) error {
+	owned := resources.RestoreOwnedName(restore)
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: restore.Namespace}}
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
+		if err := resources.MutateRestoreConfigMap(cm, restore, r.Config); err != nil {
+			return err
+		}
+		return controllerutil.SetControllerReference(restore, cm, r.Scheme)
+	})
+	return err
+}
+
+func (r *RestoreReconciler) ensurePVC(ctx context.Context, restore *karkivev1alpha1.Restore) error {
+	if restore.Spec.Persistence != nil && restore.Spec.Persistence.Enabled != nil && !*restore.Spec.Persistence.Enabled {
+		return nil
+	}
+	owned := resources.RestoreOwnedName(restore)
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: restore.Namespace}}
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, pvc, func() error {
+		if !pvc.CreationTimestamp.IsZero() {
+			pvc.Labels = resources.RestoreLabels(restore)
+			return controllerutil.SetControllerReference(restore, pvc, r.Scheme)
+		}
+		resources.MutateRestorePVC(pvc, restore)
+		return controllerutil.SetControllerReference(restore, pvc, r.Scheme)
+	})
+	return err
+}
+
+func (r *RestoreReconciler) ensureCronJob(ctx context.Context, restore *karkivev1alpha1.Restore) error {
+	owned := resources.RestoreOwnedName(restore)
+	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: restore.Namespace}}
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cj, func() error {
+		resources.MutateRestoreCronJob(cj, restore, r.Config)
+		return controllerutil.SetControllerReference(restore, cj, r.Scheme)
+	})
+	return err
+}
+
+func (r *RestoreReconciler) setStatus(
+	ctx context.Context,
+	restore *karkivev1alpha1.Restore,
+	phase string,
+	ready metav1.ConditionStatus,
+	reason, message string,
+) error {
+	restore.Status.Phase = phase
 	restore.Status.ObservedGeneration = restore.Generation
 	meta.SetStatusCondition(&restore.Status.Conditions, metav1.Condition{
 		Type:               conditionReady,
-		Status:             metav1.ConditionFalse,
-		Reason:             "NotImplemented",
-		Message:            msg,
+		Status:             ready,
+		Reason:             reason,
+		Message:            message,
 		ObservedGeneration: restore.Generation,
 	})
-	return ctrl.Result{}, r.Status().Update(ctx, restore)
+	return r.Status().Update(ctx, restore)
 }
 
 func (r *RestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&karkivev1alpha1.Restore{}).
+		Owns(&batchv1.CronJob{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
 }

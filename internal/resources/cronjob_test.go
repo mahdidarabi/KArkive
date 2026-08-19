@@ -117,6 +117,99 @@ func TestPersistenceDisabledUsesEmptyDir(t *testing.T) {
 	}
 }
 
+func testRestore() *karkivev1alpha1.Restore {
+	return &karkivev1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{Name: "app-postgres", Namespace: "backup"},
+		Spec: karkivev1alpha1.RestoreSpec{
+			Engine:   karkivev1alpha1.EnginePostgres,
+			Schedule: "30 2 * * *",
+			Database: karkivev1alpha1.DatabaseSpec{
+				Host:      "postgres.example.svc.cluster.local",
+				Name:      "app",
+				OwnerRole: "app",
+			},
+			S3: karkivev1alpha1.S3Spec{
+				Endpoint: "https://s3.example.com",
+				Bucket:   "backups",
+				Path:     "app/pgdump",
+			},
+			SecretRef: corev1.LocalObjectReference{Name: "restore-app-postgres"},
+			PostgresSecret: &karkivev1alpha1.SecretKeySelector{
+				Name: "postgres",
+			},
+			Persistence: &karkivev1alpha1.PersistenceSpec{Enabled: ptr.To(false)},
+		},
+	}
+}
+
+func TestMutateRestoreConfigMap_Postgres(t *testing.T) {
+	cm := &corev1.ConfigMap{}
+	if err := MutateRestoreConfigMap(cm, testRestore(), config.Config{}); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"ENGINE":                        "postgres",
+		"DUMP_PREFIX":                   "pg_dump",
+		"WORKDIR":                       "/workdir",
+		"PGHOST":                        "postgres.example.svc.cluster.local",
+		"PGPORT":                        "5432",
+		"PGDATABASE":                    "app",
+		"PG_OWNER_ROLE":                 "app",
+		"S3_PATH":                       "app/pgdump",
+		"USE_LATEST_BACKUP_AS_FALLBACK": "true",
+		"DROP_DATABASE_IF_EXISTS":       "true",
+		"STRIP_PGAUDIT_EXTENSION":       "true",
+	}
+	for k, v := range want {
+		if cm.Data[k] != v {
+			t.Errorf("data[%s]=%q, want %q", k, cm.Data[k], v)
+		}
+	}
+}
+
+func TestMutateRestoreCronJob_PostgresStages(t *testing.T) {
+	cj := &batchv1.CronJob{}
+	MutateRestoreCronJob(cj, testRestore(), config.Config{})
+
+	got := containerNames(cj)
+	want := []string{"cleanup", "fetch", "decrypt", "extract", "pgrestore"}
+	if len(got) != len(want) {
+		t.Fatalf("containers=%v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("containers=%v, want %v", got, want)
+		}
+	}
+
+	fetch := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[1]
+	if !hasEnv(fetch, "S3_ACCESS_KEY") || !hasEnv(fetch, "S3_SECRET_KEY") {
+		t.Errorf("fetch missing S3 keys from secret")
+	}
+	pgrestore := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[4]
+	if !hasEnv(pgrestore, "PGUSER") || !hasEnv(pgrestore, "PGPASSWORD") {
+		t.Errorf("pgrestore missing PGUSER/PGPASSWORD from postgresSecret")
+	}
+	if cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != corev1.RestartPolicyNever {
+		t.Errorf("restartPolicy=%q", cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy)
+	}
+	if *cj.Spec.JobTemplate.Spec.BackoffLimit != 1 {
+		t.Errorf("backoffLimit=%v", cj.Spec.JobTemplate.Spec.BackoffLimit)
+	}
+
+	var workdir *corev1.Volume
+	for i := range cj.Spec.JobTemplate.Spec.Template.Spec.Volumes {
+		v := &cj.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]
+		if v.Name == volumeWorkdir {
+			workdir = v
+			break
+		}
+	}
+	if workdir == nil || workdir.EmptyDir == nil {
+		t.Fatalf("expected emptyDir workdir, got %#v", workdir)
+	}
+}
+
 func TestDumpPrefixAndPort(t *testing.T) {
 	if DumpPrefix(karkivev1alpha1.EnginePostgres) != "pg_dump" {
 		t.Fatal(DumpPrefix(karkivev1alpha1.EnginePostgres))

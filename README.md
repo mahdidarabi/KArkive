@@ -2,9 +2,9 @@
 
 Kubernetes operator that reads `Backup` / `Restore` CRs and runs the same
 logical dump pipeline as the existing Helm CronJobs: dump → gzip → gpg → S3
-(and the reverse, later).
+(and the reverse).
 
-**Phase 1:** PostgreSQL backup. MariaDB, Redis, and restore land in follow-up work.
+**Phase 1:** PostgreSQL backup and restore. MariaDB and Redis land in follow-up work.
 The CRDs already accept those engines so the API does not need a rename later.
 
 ## Layout
@@ -32,8 +32,14 @@ A `Backup` named `app-postgres` is reconciled into:
 
 Containers in the CronJob: `cleanup` → `pgdump` → `compress` → `encrypt` → `s3-sync`.
 
-Secret keys (same namespace as the CR): `username`, `password`,
+A `Restore` named `app-postgres` is reconciled into the same shape (`karkive-<restore-name>`).
+Containers: `cleanup` → `fetch` → `decrypt` → `extract` → `pgrestore`.
+
+Backup secret keys (same namespace as the CR): `username`, `password`,
 `s3_access_key`, `s3_secret_key`, `gpg_passphrase`.
+
+Restore `secretRef` keys: `s3_access_key`, `s3_secret_key`, `gpg_passphrase`.
+Target DB credentials come from `spec.postgresSecret` (`username` / `password` by default).
 
 ## Develop
 
@@ -53,7 +59,7 @@ helm install karkive ./charts/karkive -n karkive-system --create-namespace
 
 ## Roadmap
 
-1. Postgres backup (this tree)
-2. Postgres restore
+1. Postgres backup (done)
+2. Postgres restore (done)
 3. MariaDB backup / restore
 4. Redis backup / restore

@@ -23,7 +23,7 @@ defaults:
   busyboxImage: docker.io/library/busybox:1.37
   # encrypt (gpg)
   gnupgImage: docker.io/vladgh/gpg:1.3.11
-  # pgdump only
+  # pg_dump / psql (backup + restore)
   postgresImage: docker.io/cloudnative-pg/postgresql:18.4
   mcImage: docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
   mariadbImage: docker.io/library/mariadb:10.6

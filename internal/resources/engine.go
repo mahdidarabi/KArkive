@@ -13,7 +13,7 @@ func EffectiveEngine(engine karkivev1alpha1.Engine) karkivev1alpha1.Engine {
 }
 
 // EngineImplemented reports whether the operator can reconcile this engine.
-// Phase 1: postgres backup only.
+// Postgres backup and restore are implemented; MariaDB and Redis are not.
 func EngineImplemented(engine karkivev1alpha1.Engine) bool {
 	return EffectiveEngine(engine) == karkivev1alpha1.EnginePostgres
 }

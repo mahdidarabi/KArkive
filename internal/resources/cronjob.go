@@ -13,6 +13,7 @@ import (
 
 const (
 	volumeDataDir = "datadir"
+	volumeWorkdir = "workdir"
 	volumeTmp     = "empty-dir"
 	volumeGPG     = "gpg-credentials"
 
@@ -157,9 +158,19 @@ type scriptOpts struct {
 	Resources  corev1.ResourceRequirements
 	Security   *corev1.SecurityContext
 	TmpSubPath string
+	Volume     string
+	MountPath  string
 }
 
 func newScriptContainer(opts scriptOpts) corev1.Container {
+	vol := opts.Volume
+	if vol == "" {
+		vol = volumeDataDir
+	}
+	mount := opts.MountPath
+	if mount == "" {
+		mount = mountDataDir
+	}
 	return corev1.Container{
 		Name:            opts.Name,
 		Image:           opts.Image,
@@ -173,7 +184,7 @@ func newScriptContainer(opts scriptOpts) corev1.Container {
 		Resources:       opts.Resources,
 		SecurityContext: opts.Security,
 		VolumeMounts: []corev1.VolumeMount{
-			{Name: volumeDataDir, MountPath: mountDataDir},
+			{Name: vol, MountPath: mount},
 			{Name: volumeTmp, MountPath: mountTmp, SubPath: opts.TmpSubPath},
 		},
 	}

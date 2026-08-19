@@ -25,9 +25,8 @@ type RestoreResources struct {
 }
 
 // RestoreSpec defines the desired state of Restore.
-// The Restore controller is a stub in this phase (postgres backup ships first).
 type RestoreSpec struct {
-	// Engine of the restore target. Only postgres will be implemented next.
+	// Engine of the restore target. Only postgres is implemented.
 	// +kubebuilder:default=postgres
 	Engine Engine `json:"engine,omitempty"`
 
@@ -97,6 +96,7 @@ const (
 	RestorePhasePending        = "Pending"
 	RestorePhaseReady          = "Ready"
 	RestorePhaseError          = "Error"
+	RestorePhaseUnsupported    = "Unsupported"
 	RestorePhaseNotImplemented = "NotImplemented"
 )
 

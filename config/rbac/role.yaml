@@ -48,6 +48,7 @@ rules:
   - karkive.io
   resources:
   - backups
+  - restores
   verbs:
   - create
   - delete
@@ -72,13 +73,3 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - karkive.io
-  resources:
-  - restores
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch

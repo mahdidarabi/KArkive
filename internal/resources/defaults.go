@@ -69,6 +69,51 @@ func DefaultS3SyncResources() corev1.ResourceRequirements {
 	}
 }
 
+func DefaultFetchResources() corev1.ResourceRequirements {
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:              resource.MustParse("50m"),
+			corev1.ResourceMemory:           resource.MustParse("64Mi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("10Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:              resource.MustParse("200m"),
+			corev1.ResourceMemory:           resource.MustParse("128Mi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+		},
+	}
+}
+
+func DefaultDecryptExtractResources() corev1.ResourceRequirements {
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:              resource.MustParse("100m"),
+			corev1.ResourceMemory:           resource.MustParse("128Mi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("10Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:              resource.MustParse("500m"),
+			corev1.ResourceMemory:           resource.MustParse("256Mi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+		},
+	}
+}
+
+func DefaultRestoreStageResources() corev1.ResourceRequirements {
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:              resource.MustParse("100m"),
+			corev1.ResourceMemory:           resource.MustParse("256Mi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("10Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:              resource.MustParse("1"),
+			corev1.ResourceMemory:           resource.MustParse("1Gi"),
+			corev1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+		},
+	}
+}
+
 func mergeResources(base corev1.ResourceRequirements, override *corev1.ResourceRequirements) corev1.ResourceRequirements {
 	if override == nil {
 		return base
@@ -91,6 +136,21 @@ func mergeResources(base corev1.ResourceRequirements, override *corev1.ResourceR
 		}
 	}
 	return out
+}
+
+func restoreStageResources(restore *karkivev1alpha1.Restore) (cleanup, fetch, decrypt, extract, restoreRes corev1.ResourceRequirements) {
+	var res *karkivev1alpha1.RestoreResources
+	if restore.Spec.Resources != nil {
+		res = restore.Spec.Resources
+	} else {
+		res = &karkivev1alpha1.RestoreResources{}
+	}
+	cleanup = mergeResources(DefaultCleanupResources(), res.Cleanup)
+	fetch = mergeResources(DefaultFetchResources(), res.Fetch)
+	decrypt = mergeResources(DefaultDecryptExtractResources(), res.Decrypt)
+	extract = mergeResources(DefaultDecryptExtractResources(), res.Extract)
+	restoreRes = mergeResources(DefaultRestoreStageResources(), res.Restore)
+	return
 }
 
 func backupStageResources(backup *karkivev1alpha1.Backup) (cleanup, dump, compress, encrypt, s3sync corev1.ResourceRequirements) {
@@ -144,6 +204,37 @@ func gnuPGImage(backup *karkivev1alpha1.Backup, cfg config.Config) (string, core
 	return resolveImage(imageOverride(backup, func(i *karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec {
 		return i.GnuPG
 	}), cfg.GnuPGImage, config.DefaultGnuPGImage)
+}
+
+func restorePostgresImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
+	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
+		return i.Postgres
+	}), cfg.PostgresImage, config.DefaultPostgresImage)
+}
+
+func restoreMcImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
+	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
+		return i.Mc
+	}), cfg.McImage, config.DefaultMcImage)
+}
+
+func restoreBusyBoxImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
+	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
+		return i.BusyBox
+	}), cfg.BusyBoxImage, config.DefaultBusyBoxImage)
+}
+
+func restoreGnuPGImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
+	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
+		return i.GnuPG
+	}), cfg.GnuPGImage, config.DefaultGnuPGImage)
+}
+
+func restoreImageOverride(restore *karkivev1alpha1.Restore, pick func(*karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec) *karkivev1alpha1.ImageSpec {
+	if restore.Spec.Images == nil {
+		return nil
+	}
+	return pick(restore.Spec.Images)
 }
 
 func imageOverride(backup *karkivev1alpha1.Backup, pick func(*karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec) *karkivev1alpha1.ImageSpec {
@@ -202,4 +293,55 @@ func mcConfigDir(backup *karkivev1alpha1.Backup) string {
 
 func secretName(backup *karkivev1alpha1.Backup) string {
 	return backup.Spec.SecretRef.Name
+}
+
+func restoreS3Endpoint(restore *karkivev1alpha1.Restore, cfg config.Config) string {
+	return firstNonEmpty(restore.Spec.S3.Endpoint, cfg.DefaultS3Endpoint)
+}
+
+func restoreS3Bucket(restore *karkivev1alpha1.Restore, cfg config.Config) string {
+	return firstNonEmpty(restore.Spec.S3.Bucket, cfg.DefaultS3Bucket)
+}
+
+func restoreWorkdir(restore *karkivev1alpha1.Restore) string {
+	return firstNonEmpty(restore.Spec.Workdir, config.DefaultWorkdir)
+}
+
+func restoreMcConfigDir(restore *karkivev1alpha1.Restore) string {
+	return firstNonEmpty(restore.Spec.McConfigDir, config.DefaultMcConfigDir)
+}
+
+func restoreOwnerRole(restore *karkivev1alpha1.Restore) string {
+	return firstNonEmpty(restore.Spec.Database.OwnerRole, restore.Spec.Database.Name)
+}
+
+func restoreSecretName(restore *karkivev1alpha1.Restore) string {
+	return restore.Spec.SecretRef.Name
+}
+
+func RestorePostgresSecret(restore *karkivev1alpha1.Restore) (name, userKey, passKey string) {
+	name, userKey, passKey = "postgres", "username", "password"
+	if s := restore.Spec.PostgresSecret; s != nil {
+		if s.Name != "" {
+			name = s.Name
+		}
+		if s.UsernameKey != "" {
+			userKey = s.UsernameKey
+		}
+		if s.PasswordKey != "" {
+			passKey = s.PasswordKey
+		}
+	}
+	return
+}
+
+func boolEnv(p *bool, def bool) string {
+	v := def
+	if p != nil {
+		v = *p
+	}
+	if v {
+		return "true"
+	}
+	return "false"
 }

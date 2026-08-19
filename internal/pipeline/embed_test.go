@@ -13,3 +13,15 @@ func TestBackupScriptsEmbedded(t *testing.T) {
 		}
 	}
 }
+
+func TestRestoreScriptsEmbedded(t *testing.T) {
+	for _, name := range []string{"cleanup.sh", "fetch.sh", "decrypt.sh", "extract.sh", "pgrestore.sh"} {
+		s, err := RestoreScript(name)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if s == "" {
+			t.Fatalf("%s is empty", name)
+		}
+	}
+}

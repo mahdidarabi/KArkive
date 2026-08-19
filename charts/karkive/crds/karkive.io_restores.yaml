@@ -53,9 +53,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: |-
-              RestoreSpec defines the desired state of Restore.
-              The Restore controller is a stub in this phase (postgres backup ships first).
+            description: RestoreSpec defines the desired state of Restore.
             properties:
               backupFile:
                 description: |-
@@ -99,8 +97,7 @@ spec:
                 type: boolean
               engine:
                 default: postgres
-                description: Engine of the restore target. Only postgres will be implemented
-                  next.
+                description: Engine of the restore target. Only postgres is implemented.
                 enum:
                 - postgres
                 - mariadb
