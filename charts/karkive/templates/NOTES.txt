@@ -1,0 +1,8 @@
+Karkive operator {{ .Chart.AppVersion }} installed in {{ .Release.Namespace }}.
+
+Install a Backup or Restore CR (postgres only in this phase):
+
+  kubectl apply -f config/samples/karkive_v1alpha1_backup.yaml
+  kubectl apply -f config/samples/karkive_v1alpha1_restore.yaml
+
+The operator creates a ConfigMap, optional PVC, and CronJob named `karkive-<cr-name>`.

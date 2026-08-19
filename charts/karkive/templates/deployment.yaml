@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "karkive.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "karkive.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "karkive.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "karkive.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "karkive.serviceAccountName" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: manager
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --leader-elect={{ .Values.leaderElection }}
+            - --health-probe-bind-address=:{{ .Values.probes.port }}
+            - --metrics-bind-address=:{{ .Values.metrics.port }}
+            - --busybox-image={{ .Values.defaults.busyboxImage }}
+            - --gnupg-image={{ .Values.defaults.gnupgImage }}
+            - --postgres-image={{ .Values.defaults.postgresImage }}
+            - --mc-image={{ .Values.defaults.mcImage }}
+            - --mariadb-image={{ .Values.defaults.mariadbImage }}
+            - --redis-image={{ .Values.defaults.redisImage }}
+            {{- if .Values.defaults.s3.endpoint }}
+            - --default-s3-endpoint={{ .Values.defaults.s3.endpoint }}
+            {{- end }}
+            {{- if .Values.defaults.s3.bucket }}
+            - --default-s3-bucket={{ .Values.defaults.s3.bucket }}
+            {{- end }}
+          {{- if .Values.watchNamespace }}
+          env:
+            - name: WATCH_NAMESPACE
+              value: {{ .Values.watchNamespace | quote }}
+          {{- end }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+            - name: health
+              containerPort: {{ .Values.probes.port }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            seccompProfile:
+              type: RuntimeDefault
