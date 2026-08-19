@@ -1,0 +1,3 @@
+resources:
+- karkive.io_backups.yaml
+- karkive.io_restores.yaml

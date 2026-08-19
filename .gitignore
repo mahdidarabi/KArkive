@@ -1,0 +1,13 @@
+bin/
+dist/
+temp/
+*.out
+cover.out
+coverage.html
+.idea/
+.vscode/
+*.swp
+.DS_Store
+.env
+.env.*
+!config/samples/

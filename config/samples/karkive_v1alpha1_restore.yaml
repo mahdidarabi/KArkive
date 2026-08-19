@@ -1,0 +1,29 @@
+# Restore CRD is registered so the API is stable. The controller is a stub
+# until the restore phase; applying this will only set status.phase=NotImplemented.
+apiVersion: karkive.io/v1alpha1
+kind: Restore
+metadata:
+  name: app-postgres
+  namespace: backup
+spec:
+  engine: postgres
+  schedule: "30 2 * * *"
+  suspend: true
+  database:
+    host: postgres.example.svc.cluster.local
+    port: 5432
+    name: app
+    ownerRole: app
+  s3:
+    endpoint: https://s3.example.com
+    bucket: backups
+    path: app/pgdump
+  secretRef:
+    name: restore-app-postgres
+  postgresSecret:
+    name: postgres
+    usernameKey: username
+    passwordKey: password
+  persistence:
+    enabled: false
+    size: 2Gi

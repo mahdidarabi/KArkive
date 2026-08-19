@@ -1,0 +1,46 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "karkive.fullname" . }}
+  labels:
+    {{- include "karkive.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["karkive.io"]
+    resources: ["backups", "restores"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["karkive.io"]
+    resources: ["backups/status", "restores/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["karkive.io"]
+    resources: ["backups/finalizers", "restores/finalizers"]
+    verbs: ["update"]
+  - apiGroups: ["batch"]
+    resources: ["cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "karkive.fullname" . }}
+  labels:
+    {{- include "karkive.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "karkive.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "karkive.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
