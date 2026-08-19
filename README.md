@@ -54,8 +54,12 @@ kubectl apply -f config/samples/karkive_v1alpha1_backup.yaml
 Deploy the operator:
 
 ```bash
-helm install karkive ./charts/karkive -n karkive-system --create-namespace
+helm install karkive ./charts/karkive -n karkive-system --create-namespace \
+  --set image.tag=latest
 ```
+
+Images are published to `ghcr.io/mahdidarabi/karkive` from GitHub Actions on
+`main` (`latest`, `main`, `sha-<git-sha>`) and on tags `v*` (semver).
 
 ## Roadmap
 
