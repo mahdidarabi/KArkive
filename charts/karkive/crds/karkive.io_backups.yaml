@@ -594,7 +594,7 @@ spec:
               suspend:
                 description: |-
                   Suspend stops scheduled runs. The CronJob remains for
-                  `kubectl create job --from=cronjob/<name>`.
+                  `kubectl create job --from=cronjob/karkive-<name>`.
                 type: boolean
             required:
             - database

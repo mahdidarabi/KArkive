@@ -26,9 +26,9 @@ A `Backup` named `app-postgres` is reconciled into:
 
 | Resource | Name |
 | --- | --- |
-| ConfigMap | `app-postgres` |
-| PVC | `app-postgres` (skip with `spec.persistence.enabled: false`) |
-| CronJob | `app-postgres` |
+| ConfigMap | `karkive-app-postgres` |
+| PVC | `karkive-app-postgres` (skip with `spec.persistence.enabled: false`) |
+| CronJob | `karkive-app-postgres` |
 
 Containers in the CronJob: `cleanup` → `pgdump` → `compress` → `encrypt` → `s3-sync`.
 

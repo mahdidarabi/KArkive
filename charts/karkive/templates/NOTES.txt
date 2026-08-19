@@ -4,4 +4,4 @@ Install a Backup CR (postgres only in this phase):
 
   kubectl apply -f config/samples/karkive_v1alpha1_backup.yaml
 
-The operator creates a ConfigMap, PVC, and CronJob named after the Backup.
+The operator creates a ConfigMap, PVC, and CronJob named `karkive-<backup-name>`.

@@ -17,6 +17,7 @@ import (
 
 	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
 	"github.com/mahdidarabi/Karkive/internal/config"
+	"github.com/mahdidarabi/Karkive/internal/resources"
 )
 
 func testScheme(t *testing.T) *runtime.Scheme {
@@ -82,20 +83,24 @@ func TestBackupReconcile_CreatesOwnedResources(t *testing.T) {
 	}
 
 	cm := &corev1.ConfigMap{}
-	if err := c.Get(context.Background(), client.ObjectKeyFromObject(backup), cm); err != nil {
+	owned := resources.BackupOwnedName(backup)
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: owned}, cm); err != nil {
 		t.Fatalf("configmap: %v", err)
 	}
 	if cm.Data["PGDATABASE"] != "app" {
 		t.Errorf("PGDATABASE=%q", cm.Data["PGDATABASE"])
 	}
+	if cm.Name != "karkive-app-postgres" {
+		t.Errorf("configmap name=%q", cm.Name)
+	}
 
 	pvc := &corev1.PersistentVolumeClaim{}
-	if err := c.Get(context.Background(), client.ObjectKeyFromObject(backup), pvc); err != nil {
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: owned}, pvc); err != nil {
 		t.Fatalf("pvc: %v", err)
 	}
 
 	cj := &batchv1.CronJob{}
-	if err := c.Get(context.Background(), client.ObjectKeyFromObject(backup), cj); err != nil {
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: owned}, cj); err != nil {
 		t.Fatalf("cronjob: %v", err)
 	}
 	if len(cj.Spec.JobTemplate.Spec.Template.Spec.Containers) != 5 {
@@ -108,6 +113,9 @@ func TestBackupReconcile_CreatesOwnedResources(t *testing.T) {
 	}
 	if updated.Status.Phase != karkivev1alpha1.BackupPhaseReady {
 		t.Errorf("phase=%q", updated.Status.Phase)
+	}
+	if updated.Status.CronJobName != owned {
+		t.Errorf("status.cronJobName=%q", updated.Status.CronJobName)
 	}
 	cond := meta.FindStatusCondition(updated.Status.Conditions, conditionReady)
 	if cond == nil || cond.Status != metav1.ConditionTrue {

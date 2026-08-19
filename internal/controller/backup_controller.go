@@ -97,7 +97,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	cron := &batchv1.CronJob{}
-	if err := r.Get(ctx, req.NamespacedName, cron); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Namespace: backup.Namespace, Name: resources.BackupOwnedName(backup)}, cron); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -151,7 +151,8 @@ func (r *BackupReconciler) ensureSecret(ctx context.Context, backup *karkivev1al
 }
 
 func (r *BackupReconciler) ensureConfigMap(ctx context.Context, backup *karkivev1alpha1.Backup) error {
-	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace}}
+	owned := resources.BackupOwnedName(backup)
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: backup.Namespace}}
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
 		if err := resources.MutateBackupConfigMap(cm, backup, r.Config); err != nil {
 			return err
@@ -165,7 +166,8 @@ func (r *BackupReconciler) ensurePVC(ctx context.Context, backup *karkivev1alpha
 	if backup.Spec.Persistence != nil && backup.Spec.Persistence.Enabled != nil && !*backup.Spec.Persistence.Enabled {
 		return nil
 	}
-	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace}}
+	owned := resources.BackupOwnedName(backup)
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: backup.Namespace}}
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, pvc, func() error {
 		if !pvc.CreationTimestamp.IsZero() {
 			pvc.Labels = resources.BackupLabels(backup)
@@ -178,7 +180,8 @@ func (r *BackupReconciler) ensurePVC(ctx context.Context, backup *karkivev1alpha
 }
 
 func (r *BackupReconciler) ensureCronJob(ctx context.Context, backup *karkivev1alpha1.Backup) error {
-	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: backup.Name, Namespace: backup.Namespace}}
+	owned := resources.BackupOwnedName(backup)
+	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: backup.Namespace}}
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cj, func() error {
 		resources.MutateBackupCronJob(cj, backup, r.Config)
 		return controllerutil.SetControllerReference(backup, cj, r.Scheme)

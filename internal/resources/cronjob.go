@@ -36,7 +36,8 @@ func MutateBackupCronJob(cj *batchv1.CronJob, backup *karkivev1alpha1.Backup, cf
 	mcImg, mcPull := mcImage(backup, cfg)
 	cleanupRes, dumpRes, compressRes, encryptRes, s3Res := backupStageResources(backup)
 	secret := secretName(backup)
-	cmName := backup.Name
+	owned := BackupOwnedName(backup)
+	cmName := owned
 	labels := BackupLabels(backup)
 
 	concurrency := batchv1.ForbidConcurrent
@@ -195,7 +196,7 @@ func backupVolumes(backup *karkivev1alpha1.Backup, secret string) []corev1.Volum
 	if persistenceEnabled(backup.Spec.Persistence) {
 		datadir = corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: backup.Name,
+				ClaimName: BackupOwnedName(backup),
 			},
 		}
 	} else {

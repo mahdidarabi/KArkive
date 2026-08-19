@@ -41,7 +41,7 @@ type BackupSpec struct {
 	Schedule string `json:"schedule"`
 
 	// Suspend stops scheduled runs. The CronJob remains for
-	// `kubectl create job --from=cronjob/<name>`.
+	// `kubectl create job --from=cronjob/karkive-<name>`.
 	Suspend *bool `json:"suspend,omitempty"`
 
 	// Database connection (non-secret fields).
