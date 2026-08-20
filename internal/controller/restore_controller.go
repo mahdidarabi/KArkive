@@ -99,13 +99,9 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := r.ensurePVC(ctx, restore); err != nil {
 		return ctrl.Result{}, r.fail(ctx, restore, "PVCError", err)
 	}
-	if err := r.ensureCronJob(ctx, restore); err != nil {
+	cron, err := r.ensureCronJob(ctx, restore)
+	if err != nil {
 		return ctrl.Result{}, r.fail(ctx, restore, "CronJobError", err)
-	}
-
-	cron := &batchv1.CronJob{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: restore.Namespace, Name: resources.RestoreOwnedName(restore)}, cron); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	restore.Status.CronJobName = cron.Name
@@ -215,14 +211,14 @@ func (r *RestoreReconciler) ensurePVC(ctx context.Context, restore *karkivev1alp
 	return err
 }
 
-func (r *RestoreReconciler) ensureCronJob(ctx context.Context, restore *karkivev1alpha1.Restore) error {
+func (r *RestoreReconciler) ensureCronJob(ctx context.Context, restore *karkivev1alpha1.Restore) (*batchv1.CronJob, error) {
 	owned := resources.RestoreOwnedName(restore)
 	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: restore.Namespace}}
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cj, func() error {
 		resources.MutateRestoreCronJob(cj, restore, r.Config)
 		return controllerutil.SetControllerReference(restore, cj, r.Scheme)
 	})
-	return err
+	return cj, err
 }
 
 func (r *RestoreReconciler) setStatus(

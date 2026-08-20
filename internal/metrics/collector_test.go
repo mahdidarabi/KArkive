@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -87,6 +88,110 @@ func TestCollector_BackupAndLastJob(t *testing.T) {
 	}
 	if got["karkive_backup_last_job_duration_seconds"] != 120 {
 		t.Errorf("duration=%v", got["karkive_backup_last_job_duration_seconds"])
+	}
+}
+
+func TestCollector_AlwaysEmitsDuration(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := karkivev1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := batchv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	backup := &karkivev1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "app-postgres", Namespace: "backup"},
+		Spec:       karkivev1alpha1.BackupSpec{Engine: karkivev1alpha1.EnginePostgres},
+		Status:     karkivev1alpha1.BackupStatus{Phase: karkivev1alpha1.BackupPhaseReady},
+	}
+	restore := &karkivev1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{Name: "app-postgres", Namespace: "backup"},
+		Spec:       karkivev1alpha1.RestoreSpec{Engine: karkivev1alpha1.EnginePostgres},
+		Status:     karkivev1alpha1.RestoreStatus{Phase: karkivev1alpha1.RestorePhaseReady},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, restore).Build()
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(&Collector{Client: c})
+	fams, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]float64{}
+	for _, fam := range fams {
+		for _, m := range fam.Metric {
+			if match(m, "backup", "app-postgres") {
+				got[fam.GetName()] = m.GetGauge().GetValue()
+			}
+		}
+	}
+	if _, ok := got["karkive_backup_last_job_duration_seconds"]; !ok {
+		t.Fatal("expected backup duration series with no Job")
+	}
+	if got["karkive_backup_last_job_duration_seconds"] != 0 {
+		t.Errorf("backup duration=%v", got["karkive_backup_last_job_duration_seconds"])
+	}
+	if _, ok := got["karkive_restore_last_job_duration_seconds"]; !ok {
+		t.Fatal("expected restore duration series with no Job")
+	}
+	if got["karkive_restore_last_job_duration_seconds"] != 0 {
+		t.Errorf("restore duration=%v", got["karkive_restore_last_job_duration_seconds"])
+	}
+}
+
+func TestCollector_FailedJobWithoutCompletionTime(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := karkivev1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := batchv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	start := metav1.NewTime(time.Unix(1_700_000_000, 0))
+	failedAt := metav1.NewTime(start.Add(30 * time.Second))
+	restore := &karkivev1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{Name: "cache-redis", Namespace: "backup"},
+		Spec:       karkivev1alpha1.RestoreSpec{Engine: karkivev1alpha1.EngineRedis},
+	}
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "karkive-cache-redis-1",
+			Namespace: "backup",
+			Labels: map[string]string{
+				resources.LabelAppManagedBy: resources.ManagedBy,
+				resources.LabelKind:         resources.KindRestore,
+				resources.LabelRestoreName:  "cache-redis",
+			},
+		},
+		Status: batchv1.JobStatus{
+			Failed:    1,
+			StartTime: &start,
+			Conditions: []batchv1.JobCondition{{
+				Type:               batchv1.JobFailed,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: failedAt,
+			}},
+		},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(restore, job).Build()
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(&Collector{Client: c})
+	fams, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]float64{}
+	for _, fam := range fams {
+		for _, m := range fam.Metric {
+			if match(m, "backup", "cache-redis") {
+				got[fam.GetName()] = m.GetGauge().GetValue()
+			}
+		}
+	}
+	if got["karkive_restore_last_job_failed"] != 1 {
+		t.Errorf("failed=%v", got["karkive_restore_last_job_failed"])
+	}
+	if got["karkive_restore_last_job_duration_seconds"] != 30 {
+		t.Errorf("duration=%v", got["karkive_restore_last_job_duration_seconds"])
 	}
 }
 

@@ -93,13 +93,9 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := r.ensurePVC(ctx, backup); err != nil {
 		return ctrl.Result{}, r.fail(ctx, backup, "PVCError", err)
 	}
-	if err := r.ensureCronJob(ctx, backup); err != nil {
+	cron, err := r.ensureCronJob(ctx, backup)
+	if err != nil {
 		return ctrl.Result{}, r.fail(ctx, backup, "CronJobError", err)
-	}
-
-	cron := &batchv1.CronJob{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: backup.Namespace, Name: resources.BackupOwnedName(backup)}, cron); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	backup.Status.CronJobName = cron.Name
@@ -180,14 +176,14 @@ func (r *BackupReconciler) ensurePVC(ctx context.Context, backup *karkivev1alpha
 	return err
 }
 
-func (r *BackupReconciler) ensureCronJob(ctx context.Context, backup *karkivev1alpha1.Backup) error {
+func (r *BackupReconciler) ensureCronJob(ctx context.Context, backup *karkivev1alpha1.Backup) (*batchv1.CronJob, error) {
 	owned := resources.BackupOwnedName(backup)
 	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: backup.Namespace}}
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cj, func() error {
 		resources.MutateBackupCronJob(cj, backup, r.Config)
 		return controllerutil.SetControllerReference(backup, cj, r.Scheme)
 	})
-	return err
+	return cj, err
 }
 
 func (r *BackupReconciler) setStatus(
