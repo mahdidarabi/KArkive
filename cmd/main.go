@@ -49,8 +49,8 @@ func main() {
 	flag.StringVar(&cfg.GnuPGImage, "gnupg-image", config.DefaultGnuPGImage, "Default image for encrypt (gpg).")
 	flag.StringVar(&cfg.PostgresImage, "postgres-image", config.DefaultPostgresImage, "Default image for pgdump (pg_dump / psql).")
 	flag.StringVar(&cfg.McImage, "mc-image", config.DefaultMcImage, "Default minio/mc image for s3-sync.")
-	flag.StringVar(&cfg.MariaDBImage, "mariadb-image", config.DefaultMariaDBImage, "Default MariaDB image (unused until that engine ships).")
-	flag.StringVar(&cfg.RedisImage, "redis-image", config.DefaultRedisImage, "Default Redis image (unused until that engine ships).")
+	flag.StringVar(&cfg.MariaDBImage, "mariadb-image", config.DefaultMariaDBImage, "Default MariaDB image for mysqldump / mysql restore.")
+	flag.StringVar(&cfg.RedisImage, "redis-image", config.DefaultRedisImage, "Default Redis image for redis-cli dump / restore.")
 	flag.StringVar(&cfg.DefaultS3Endpoint, "default-s3-endpoint", "", "Fallback S3 endpoint when Backup.spec.s3.endpoint is empty.")
 	flag.StringVar(&cfg.DefaultS3Bucket, "default-s3-bucket", "", "Fallback S3 bucket when Backup.spec.s3.bucket is empty.")
 

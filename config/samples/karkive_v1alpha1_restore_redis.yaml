@@ -1,0 +1,32 @@
+# Generic Redis restore sample. Apply after a Backup has written RDB dumps to S3
+# and a target Redis is reachable from this namespace.
+# Restore FLUSHALLs the target when spec.dropDatabaseIfExists is true (default).
+apiVersion: karkive.io/v1alpha1
+kind: Restore
+metadata:
+  name: cache-redis
+  namespace: backup
+spec:
+  engine: redis
+  schedule: "30 2 * * *"
+  suspend: true
+  database:
+    host: redis.example.svc.cluster.local
+    port: 6379
+    name: cache
+  s3:
+    endpoint: https://s3.example.com
+    bucket: backups
+    path: cache/redisdump
+  secretRef:
+    name: restore-cache-redis
+  redisSecret:
+    name: redis
+    usernameKey: username
+    passwordKey: password
+  persistence:
+    enabled: false
+    size: 2Gi
+  job:
+    backoffLimit: 1
+    restartPolicy: Never

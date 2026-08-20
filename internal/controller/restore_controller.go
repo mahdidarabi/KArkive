@@ -55,7 +55,7 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if !resources.EngineImplemented(restore.Spec.Engine) {
 		engine := resources.EffectiveEngine(restore.Spec.Engine)
-		msg := fmt.Sprintf("engine %q is not implemented yet (postgres backup and restore are implemented)", engine)
+		msg := fmt.Sprintf("engine %q is not implemented", engine)
 		logger.Info(msg)
 		r.Recorder.Event(restore, corev1.EventTypeWarning, "UnsupportedEngine", msg)
 		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseUnsupported, metav1.ConditionFalse, "UnsupportedEngine", msg)
@@ -79,18 +79,18 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "SecretInvalid", err.Error())
 	}
 
-	if err := r.ensurePostgresSecret(ctx, restore); err != nil {
+	if err := r.ensureTargetSecret(ctx, restore); err != nil {
 		if apierrors.IsNotFound(err) {
-			name, _, _ := resources.RestorePostgresSecret(restore)
-			msg := fmt.Sprintf("postgres secret %q not found", name)
-			r.Recorder.Event(restore, corev1.EventTypeWarning, "PostgresSecretNotFound", msg)
-			if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhasePending, metav1.ConditionFalse, "PostgresSecretNotFound", msg); statusErr != nil {
+			name, _, _ := resources.RestoreTargetSecret(restore)
+			msg := fmt.Sprintf("target secret %q not found", name)
+			r.Recorder.Event(restore, corev1.EventTypeWarning, "TargetSecretNotFound", msg)
+			if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhasePending, metav1.ConditionFalse, "TargetSecretNotFound", msg); statusErr != nil {
 				return ctrl.Result{}, statusErr
 			}
 			return ctrl.Result{RequeueAfter: secretRequeue}, nil
 		}
-		r.Recorder.Event(restore, corev1.EventTypeWarning, "PostgresSecretInvalid", err.Error())
-		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "PostgresSecretInvalid", err.Error())
+		r.Recorder.Event(restore, corev1.EventTypeWarning, "TargetSecretInvalid", err.Error())
+		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "TargetSecretInvalid", err.Error())
 	}
 
 	if err := r.ensureConfigMap(ctx, restore); err != nil {
@@ -140,8 +140,19 @@ func validateRestoreSpec(restore *karkivev1alpha1.Restore) error {
 	if restore.Spec.SecretRef.Name == "" {
 		return fmt.Errorf("spec.secretRef.name is required")
 	}
-	if restore.Spec.PostgresSecret == nil || restore.Spec.PostgresSecret.Name == "" {
-		return fmt.Errorf("spec.postgresSecret.name is required")
+	switch resources.EffectiveEngine(restore.Spec.Engine) {
+	case karkivev1alpha1.EngineMariaDB:
+		if restore.Spec.MariaDBSecret == nil || restore.Spec.MariaDBSecret.Name == "" {
+			return fmt.Errorf("spec.mariadbSecret.name is required")
+		}
+	case karkivev1alpha1.EngineRedis:
+		if restore.Spec.RedisSecret == nil || restore.Spec.RedisSecret.Name == "" {
+			return fmt.Errorf("spec.redisSecret.name is required")
+		}
+	default:
+		if restore.Spec.PostgresSecret == nil || restore.Spec.PostgresSecret.Name == "" {
+			return fmt.Errorf("spec.postgresSecret.name is required")
+		}
 	}
 	return nil
 }
@@ -160,8 +171,8 @@ func (r *RestoreReconciler) ensureJobSecret(ctx context.Context, restore *karkiv
 	return nil
 }
 
-func (r *RestoreReconciler) ensurePostgresSecret(ctx context.Context, restore *karkivev1alpha1.Restore) error {
-	name, userKey, passKey := resources.RestorePostgresSecret(restore)
+func (r *RestoreReconciler) ensureTargetSecret(ctx context.Context, restore *karkivev1alpha1.Restore) error {
+	name, userKey, passKey := resources.RestoreTargetSecret(restore)
 	secret := &corev1.Secret{}
 	key := client.ObjectKey{Namespace: restore.Namespace, Name: name}
 	if err := r.Get(ctx, key, secret); err != nil {
@@ -169,7 +180,7 @@ func (r *RestoreReconciler) ensurePostgresSecret(ctx context.Context, restore *k
 	}
 	for _, k := range []string{userKey, passKey} {
 		if _, ok := secret.Data[k]; !ok {
-			return fmt.Errorf("postgres secret %q is missing key %q", secret.Name, k)
+			return fmt.Errorf("target secret %q is missing key %q", secret.Name, k)
 		}
 	}
 	return nil

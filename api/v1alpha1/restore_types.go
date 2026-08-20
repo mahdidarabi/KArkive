@@ -26,7 +26,7 @@ type RestoreResources struct {
 
 // RestoreSpec defines the desired state of Restore.
 type RestoreSpec struct {
-	// Engine of the restore target. Only postgres is implemented.
+	// Engine of the restore target.
 	// +kubebuilder:default=postgres
 	Engine Engine `json:"engine,omitempty"`
 
@@ -50,10 +50,10 @@ type RestoreSpec struct {
 	// PostgresSecret is the sandbox Cluster Secret (PGUSER/PGPASSWORD).
 	PostgresSecret *SecretKeySelector `json:"postgresSecret,omitempty"`
 
-	// MariaDBSecret is reserved for a later phase.
+	// MariaDBSecret is the target MariaDB Secret (MYSQL_USER / MYSQL_PASSWORD).
 	MariaDBSecret *SecretKeySelector `json:"mariadbSecret,omitempty"`
 
-	// RedisSecret is reserved for a later phase.
+	// RedisSecret is the target Redis Secret (username optional ACL, password).
 	RedisSecret *SecretKeySelector `json:"redisSecret,omitempty"`
 
 	// Persistence for the restore workdir. Set enabled=false for lite (emptyDir) restores.

@@ -94,8 +94,7 @@ spec:
                 type: object
               engine:
                 default: postgres
-                description: Engine of the source datastore. Only postgres is reconciled
-                  in this phase.
+                description: Engine of the source datastore.
                 enum:
                 - postgres
                 - mariadb
@@ -125,7 +124,7 @@ spec:
                         type: string
                     type: object
                   mariadb:
-                    description: MariaDB is reserved for a later phase (mysqldump).
+                    description: MariaDB is used for mysqldump / mysql restore.
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -155,7 +154,7 @@ spec:
                         type: string
                     type: object
                   redis:
-                    description: Redis is reserved for a later phase (redis-cli --rdb).
+                    description: Redis is used for redis-cli --rdb dump and restore.
                     properties:
                       image:
                         description: Image is registry/repository:tag.

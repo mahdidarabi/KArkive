@@ -1,6 +1,6 @@
 Karkive operator {{ .Chart.AppVersion }} installed in {{ .Release.Namespace }}.
 
-Install a Backup or Restore CR (postgres only in this phase):
+Install a Backup or Restore CR (`engine`: postgres, mariadb, or redis):
 
   kubectl apply -f config/samples/karkive_v1alpha1_backup.yaml
   kubectl apply -f config/samples/karkive_v1alpha1_restore.yaml

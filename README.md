@@ -1,11 +1,9 @@
 # Karkive
 
-Kubernetes operator that reads `Backup` / `Restore` CRs and runs the same
-logical dump pipeline as the existing Helm CronJobs: dump → gzip → gpg → S3
-(and the reverse).
+Kubernetes operator that reads `Backup` / `Restore` CRs and runs a logical
+dump pipeline: dump → gzip → gpg → S3 (and the reverse).
 
-**Phase 1:** PostgreSQL backup and restore. MariaDB and Redis land in follow-up work.
-The CRDs already accept those engines so the API does not need a rename later.
+Engines: PostgreSQL, MariaDB, and Redis.
 
 ## Layout
 
@@ -31,16 +29,25 @@ A `Backup` named `app-postgres` is reconciled into:
 | PVC | `karkive-app-postgres` (skip with `spec.persistence.enabled: false`) |
 | CronJob | `karkive-app-postgres` |
 
-Containers in the CronJob: `cleanup` → `pgdump` → `compress` → `encrypt` → `s3-sync`.
+Containers in the CronJob depend on `spec.engine`:
 
-A `Restore` named `app-postgres` is reconciled into the same shape (`karkive-<restore-name>`).
-Containers: `cleanup` → `fetch` → `decrypt` → `extract` → `pgrestore`.
+| Engine | Dump | Restore |
+| --- | --- | --- |
+| postgres | `pgdump` | `pgrestore` |
+| mariadb | `mysqldump` | `mysqlrestore` |
+| redis | `redisdump` (`redis-cli --rdb`) | `redisrestore` |
+
+Shared stages: `cleanup` → dump → `compress` → `encrypt` → `s3-sync` (backup)
+and `cleanup` → `fetch` → `decrypt` → `extract` → restore.
 
 Backup secret keys (same namespace as the CR): `username`, `password`,
-`s3_access_key`, `s3_secret_key`, `gpg_passphrase`.
+`s3_access_key`, `s3_secret_key`, `gpg_passphrase`. For Redis, `username` is
+the ACL user (`default` if unused).
 
 Restore `secretRef` keys: `s3_access_key`, `s3_secret_key`, `gpg_passphrase`.
-Target DB credentials come from `spec.postgresSecret` (`username` / `password` by default).
+Target credentials come from `spec.postgresSecret`, `spec.mariadbSecret`, or
+`spec.redisSecret` (`username` / `password` by default). Redis restore
+`FLUSHALL`s the target when `spec.dropDatabaseIfExists` is true (default).
 
 ## Develop
 
@@ -87,5 +94,5 @@ helm install karkive ./charts/karkive -n karkive-system --create-namespace \
 
 1. Postgres backup (done)
 2. Postgres restore (done)
-3. MariaDB backup / restore
-4. Redis backup / restore
+3. MariaDB backup / restore (done)
+4. Redis backup / restore (done)

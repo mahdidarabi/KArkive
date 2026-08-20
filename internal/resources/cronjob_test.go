@@ -217,8 +217,138 @@ func TestDumpPrefixAndPort(t *testing.T) {
 	if DumpPrefix(karkivev1alpha1.EngineMariaDB) != "mysqldump" {
 		t.Fatal(DumpPrefix(karkivev1alpha1.EngineMariaDB))
 	}
+	if DumpPrefix(karkivev1alpha1.EngineRedis) != "redisdump" {
+		t.Fatal(DumpPrefix(karkivev1alpha1.EngineRedis))
+	}
 	if DefaultPort("") != 5432 {
 		t.Fatal(DefaultPort(""))
+	}
+	if DefaultPort(karkivev1alpha1.EngineMariaDB) != 3306 {
+		t.Fatal(DefaultPort(karkivev1alpha1.EngineMariaDB))
+	}
+	if DefaultPort(karkivev1alpha1.EngineRedis) != 6379 {
+		t.Fatal(DefaultPort(karkivev1alpha1.EngineRedis))
+	}
+}
+
+func testMariaBackup() *karkivev1alpha1.Backup {
+	b := testBackup()
+	b.Name = "app-mariadb"
+	b.Spec.Engine = karkivev1alpha1.EngineMariaDB
+	b.Spec.Database.Host = "mariadb.example.svc.cluster.local"
+	b.Spec.S3.Path = "app/mysqldump"
+	b.Spec.SecretRef.Name = "backup-app-mariadb"
+	return b
+}
+
+func TestMutateBackupCronJob_MariaDBStages(t *testing.T) {
+	cj := &batchv1.CronJob{}
+	MutateBackupCronJob(cj, testMariaBackup(), config.Config{})
+	got := containerNames(cj)
+	want := []string{"cleanup", "mysqldump", "compress", "encrypt", "s3-sync"}
+	if len(got) != len(want) {
+		t.Fatalf("containers=%v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("containers=%v, want %v", got, want)
+		}
+	}
+	dump := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[1]
+	if dump.Image != config.DefaultMariaDBImage {
+		t.Errorf("mysqldump image=%s", dump.Image)
+	}
+	if !hasEnv(dump, "MYSQL_USER") || !hasEnv(dump, "MYSQL_PASSWORD") {
+		t.Errorf("mysqldump missing MYSQL_USER/MYSQL_PASSWORD")
+	}
+}
+
+func TestMutateBackupConfigMap_MariaDB(t *testing.T) {
+	cm := &corev1.ConfigMap{}
+	if err := MutateBackupConfigMap(cm, testMariaBackup(), config.Config{}); err != nil {
+		t.Fatal(err)
+	}
+	if cm.Data["ENGINE"] != "mariadb" || cm.Data["DUMP_PREFIX"] != "mysqldump" {
+		t.Errorf("engine/prefix=%q/%q", cm.Data["ENGINE"], cm.Data["DUMP_PREFIX"])
+	}
+	if cm.Data["MYSQL_HOST"] != "mariadb.example.svc.cluster.local" || cm.Data["MYSQL_PORT"] != "3306" {
+		t.Errorf("mysql host/port=%q/%q", cm.Data["MYSQL_HOST"], cm.Data["MYSQL_PORT"])
+	}
+}
+
+func testRedisBackup() *karkivev1alpha1.Backup {
+	b := testBackup()
+	b.Name = "cache-redis"
+	b.Spec.Engine = karkivev1alpha1.EngineRedis
+	b.Spec.Database.Host = "redis.example.svc.cluster.local"
+	b.Spec.Database.Name = "cache"
+	b.Spec.S3.Path = "cache/redisdump"
+	b.Spec.SecretRef.Name = "backup-cache-redis"
+	return b
+}
+
+func TestMutateBackupCronJob_RedisStages(t *testing.T) {
+	cj := &batchv1.CronJob{}
+	MutateBackupCronJob(cj, testRedisBackup(), config.Config{})
+	got := containerNames(cj)
+	want := []string{"cleanup", "redisdump", "compress", "encrypt", "s3-sync"}
+	if len(got) != len(want) {
+		t.Fatalf("containers=%v, want %v", got, want)
+	}
+	dump := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[1]
+	if dump.Image != config.DefaultRedisImage {
+		t.Errorf("redisdump image=%s", dump.Image)
+	}
+	if !hasEnv(dump, "REDIS_USERNAME") || !hasEnv(dump, "REDIS_PASSWORD") {
+		t.Errorf("redisdump missing REDIS_USERNAME/REDIS_PASSWORD")
+	}
+}
+
+func testMariaRestore() *karkivev1alpha1.Restore {
+	r := testRestore()
+	r.Name = "app-mariadb"
+	r.Spec.Engine = karkivev1alpha1.EngineMariaDB
+	r.Spec.Database.Host = "mariadb.example.svc.cluster.local"
+	r.Spec.Database.OwnerRole = ""
+	r.Spec.S3.Path = "app/mysqldump"
+	r.Spec.PostgresSecret = nil
+	r.Spec.MariaDBSecret = &karkivev1alpha1.SecretKeySelector{Name: "mariadb"}
+	return r
+}
+
+func TestMutateRestoreCronJob_MariaDBStages(t *testing.T) {
+	cj := &batchv1.CronJob{}
+	MutateRestoreCronJob(cj, testMariaRestore(), config.Config{})
+	got := containerNames(cj)
+	want := []string{"cleanup", "fetch", "decrypt", "extract", "mysqlrestore"}
+	if len(got) != len(want) {
+		t.Fatalf("containers=%v, want %v", got, want)
+	}
+	restorec := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[4]
+	if !hasEnv(restorec, "MYSQL_USER") || !hasEnv(restorec, "MYSQL_PASSWORD") {
+		t.Errorf("mysqlrestore missing MYSQL_USER/MYSQL_PASSWORD")
+	}
+}
+
+func testRedisRestore() *karkivev1alpha1.Restore {
+	r := testRestore()
+	r.Name = "cache-redis"
+	r.Spec.Engine = karkivev1alpha1.EngineRedis
+	r.Spec.Database.Host = "redis.example.svc.cluster.local"
+	r.Spec.Database.Name = "cache"
+	r.Spec.S3.Path = "cache/redisdump"
+	r.Spec.PostgresSecret = nil
+	r.Spec.RedisSecret = &karkivev1alpha1.SecretKeySelector{Name: "redis"}
+	return r
+}
+
+func TestMutateRestoreCronJob_RedisStages(t *testing.T) {
+	cj := &batchv1.CronJob{}
+	MutateRestoreCronJob(cj, testRedisRestore(), config.Config{})
+	got := containerNames(cj)
+	want := []string{"cleanup", "fetch", "decrypt", "extract", "redisrestore"}
+	if len(got) != len(want) {
+		t.Fatalf("containers=%v, want %v", got, want)
 	}
 }
 

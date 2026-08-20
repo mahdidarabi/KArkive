@@ -15,9 +15,9 @@ type BackupImages struct {
 	Postgres *ImageSpec `json:"postgres,omitempty"`
 	// Mc is the minio client image used for s3-sync.
 	Mc *ImageSpec `json:"mc,omitempty"`
-	// MariaDB is reserved for a later phase (mysqldump).
+	// MariaDB is used for mysqldump / mysql restore.
 	MariaDB *ImageSpec `json:"mariadb,omitempty"`
-	// Redis is reserved for a later phase (redis-cli --rdb).
+	// Redis is used for redis-cli --rdb dump and restore.
 	Redis *ImageSpec `json:"redis,omitempty"`
 }
 
@@ -32,7 +32,7 @@ type BackupResources struct {
 
 // BackupSpec defines the desired state of Backup.
 type BackupSpec struct {
-	// Engine of the source datastore. Only postgres is reconciled in this phase.
+	// Engine of the source datastore.
 	// +kubebuilder:default=postgres
 	Engine Engine `json:"engine,omitempty"`
 

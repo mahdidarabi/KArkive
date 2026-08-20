@@ -13,9 +13,13 @@ func EffectiveEngine(engine karkivev1alpha1.Engine) karkivev1alpha1.Engine {
 }
 
 // EngineImplemented reports whether the operator can reconcile this engine.
-// Postgres backup and restore are implemented; MariaDB and Redis are not.
 func EngineImplemented(engine karkivev1alpha1.Engine) bool {
-	return EffectiveEngine(engine) == karkivev1alpha1.EnginePostgres
+	switch EffectiveEngine(engine) {
+	case karkivev1alpha1.EnginePostgres, karkivev1alpha1.EngineMariaDB, karkivev1alpha1.EngineRedis:
+		return true
+	default:
+		return false
+	}
 }
 
 // DumpPrefix is the object-name prefix used by pipeline scripts.

@@ -97,7 +97,7 @@ spec:
                 type: boolean
               engine:
                 default: postgres
-                description: Engine of the restore target. Only postgres is implemented.
+                description: Engine of the restore target.
                 enum:
                 - postgres
                 - mariadb
@@ -203,7 +203,8 @@ spec:
                     type: integer
                 type: object
               mariadbSecret:
-                description: MariaDBSecret is reserved for a later phase.
+                description: MariaDBSecret is the target MariaDB Secret (MYSQL_USER
+                  / MYSQL_PASSWORD).
                 properties:
                   name:
                     description: Name of the Secret in the same namespace.
@@ -271,7 +272,8 @@ spec:
                 - name
                 type: object
               redisSecret:
-                description: RedisSecret is reserved for a later phase.
+                description: RedisSecret is the target Redis Secret (username optional
+                  ACL, password).
                 properties:
                   name:
                     description: Name of the Secret in the same namespace.

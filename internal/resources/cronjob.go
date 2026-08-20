@@ -22,16 +22,14 @@ const (
 	mountGPG     = "/run/secrets/gpg"
 )
 
-// MutateBackupCronJob writes the postgres backup pipeline CronJob.
-// Stage order: cleanup → pgdump → compress → encrypt → s3-sync.
+// MutateBackupCronJob writes the backup pipeline CronJob.
+// Stage order: cleanup → dump → compress → encrypt → s3-sync.
 func MutateBackupCronJob(cj *batchv1.CronJob, backup *karkivev1alpha1.Backup, cfg config.Config) {
-	engine := EffectiveEngine(backup.Spec.Engine)
 	job := backup.Spec.Job
 	if job == nil {
 		job = &karkivev1alpha1.JobPolicy{}
 	}
 
-	pgImage, pgPull := postgresImage(backup, cfg)
 	busyImg, busyPull := busyBoxImage(backup, cfg)
 	gpgImg, gpgPull := gnuPGImage(backup, cfg)
 	mcImg, mcPull := mcImage(backup, cfg)
@@ -60,7 +58,7 @@ func MutateBackupCronJob(cj *batchv1.CronJob, backup *karkivev1alpha1.Backup, cf
 				ConfigMap: cmName, Resources: cleanupRes,
 				Security: ToolsSecurityContext(), TmpSubPath: "cleanup-tmp",
 			}),
-			dumpContainer(engine, pgImage, pgPull, dumpRes, cmName, secret),
+			dumpContainer(backup, cfg, dumpRes, cmName, secret),
 			newScriptContainer(scriptOpts{
 				Name: "compress", Image: busyImg, Pull: busyPull,
 				Script:    pipeline.MustBackupScript("compress.sh"),
@@ -99,25 +97,53 @@ func MutateBackupCronJob(cj *batchv1.CronJob, backup *karkivev1alpha1.Backup, cf
 }
 
 func dumpContainer(
-	engine karkivev1alpha1.Engine,
-	pgImage string,
-	pgPull corev1.PullPolicy,
+	backup *karkivev1alpha1.Backup,
+	cfg config.Config,
 	res corev1.ResourceRequirements,
 	cmName, secret string,
 ) corev1.Container {
-	// Phase 1: postgres only. MariaDB/Redis dump containers land here later.
-	_ = engine
-	c := newScriptContainer(scriptOpts{
-		Name: "pgdump", Image: pgImage, Pull: pgPull,
-		Script:    pipeline.MustBackupScript("pgdump.sh"),
-		ConfigMap: cmName, Resources: res,
-		Security: PostgresSecurityContext(), TmpSubPath: "tmp-dir",
-	})
-	c.Env = append(c.Env,
-		secretEnv("PGUSER", secret, "username"),
-		secretEnv("PGPASSWORD", secret, "password"),
-	)
-	return c
+	engine := EffectiveEngine(backup.Spec.Engine)
+	switch engine {
+	case karkivev1alpha1.EngineMariaDB:
+		img, pull := mariadbImage(backup, cfg)
+		c := newScriptContainer(scriptOpts{
+			Name: "mysqldump", Image: img, Pull: pull,
+			Script:    pipeline.MustBackupScript("mysqldump.sh"),
+			ConfigMap: cmName, Resources: res,
+			Security: MariaDBSecurityContext(), TmpSubPath: "tmp-dir",
+		})
+		c.Env = append(c.Env,
+			secretEnv("MYSQL_USER", secret, "username"),
+			secretEnv("MYSQL_PASSWORD", secret, "password"),
+		)
+		return c
+	case karkivev1alpha1.EngineRedis:
+		img, pull := redisImage(backup, cfg)
+		c := newScriptContainer(scriptOpts{
+			Name: "redisdump", Image: img, Pull: pull,
+			Script:    pipeline.MustBackupScript("redisdump.sh"),
+			ConfigMap: cmName, Resources: res,
+			Security: RedisSecurityContext(), TmpSubPath: "tmp-dir",
+		})
+		c.Env = append(c.Env,
+			secretEnv("REDIS_USERNAME", secret, "username"),
+			secretEnv("REDIS_PASSWORD", secret, "password"),
+		)
+		return c
+	default:
+		img, pull := postgresImage(backup, cfg)
+		c := newScriptContainer(scriptOpts{
+			Name: "pgdump", Image: img, Pull: pull,
+			Script:    pipeline.MustBackupScript("pgdump.sh"),
+			ConfigMap: cmName, Resources: res,
+			Security: PostgresSecurityContext(), TmpSubPath: "tmp-dir",
+		})
+		c.Env = append(c.Env,
+			secretEnv("PGUSER", secret, "username"),
+			secretEnv("PGPASSWORD", secret, "password"),
+		)
+		return c
+	}
 }
 
 func encryptContainer(image string, pull corev1.PullPolicy, res corev1.ResourceRequirements, cmName string) corev1.Container {

@@ -123,21 +123,36 @@ func TestBackupReconcile_CreatesOwnedResources(t *testing.T) {
 	}
 }
 
-func TestBackupReconcile_UnsupportedEngine(t *testing.T) {
+func TestBackupReconcile_RedisCreatesOwnedResources(t *testing.T) {
 	scheme := testScheme(t)
 	backup := &karkivev1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{Name: "cache-redis", Namespace: "backup"},
 		Spec: karkivev1alpha1.BackupSpec{
-			Engine:    karkivev1alpha1.EngineRedis,
-			Schedule:  "0 */12 * * *",
-			Database:  karkivev1alpha1.DatabaseSpec{Host: "redis", Name: "cache"},
-			S3:        karkivev1alpha1.S3Spec{Path: "cache/redisdump"},
-			SecretRef: corev1.LocalObjectReference{Name: "creds"},
+			Engine:   karkivev1alpha1.EngineRedis,
+			Schedule: "0 */12 * * *",
+			Database: karkivev1alpha1.DatabaseSpec{Host: "redis.example.svc.cluster.local", Name: "cache"},
+			S3: karkivev1alpha1.S3Spec{
+				Endpoint: "https://s3.example.com",
+				Bucket:   "backups",
+				Path:     "cache/redisdump",
+			},
+			SecretRef: corev1.LocalObjectReference{Name: "backup-creds"},
 		},
 	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup-creds", Namespace: "backup"},
+		Data: map[string][]byte{
+			"username":       []byte("default"),
+			"password":       []byte("secret"),
+			"s3_access_key":  []byte("ak"),
+			"s3_secret_key":  []byte("sk"),
+			"gpg_passphrase": []byte("pgp"),
+		},
+	}
+
 	c := fake.NewClientBuilder().
 		WithScheme(scheme).
-		WithObjects(backup).
+		WithObjects(backup, secret).
 		WithStatusSubresource(&karkivev1alpha1.Backup{}).
 		Build()
 	r := &BackupReconciler{
@@ -155,11 +170,15 @@ func TestBackupReconcile_UnsupportedEngine(t *testing.T) {
 	if err := c.Get(context.Background(), client.ObjectKeyFromObject(backup), updated); err != nil {
 		t.Fatal(err)
 	}
-	if updated.Status.Phase != karkivev1alpha1.BackupPhaseUnsupported {
+	if updated.Status.Phase != karkivev1alpha1.BackupPhaseReady {
 		t.Errorf("phase=%q", updated.Status.Phase)
 	}
 	cj := &batchv1.CronJob{}
-	if err := c.Get(context.Background(), client.ObjectKeyFromObject(backup), cj); err == nil {
-		t.Fatal("did not expect a CronJob for unsupported engine")
+	owned := resources.BackupOwnedName(backup)
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: owned}, cj); err != nil {
+		t.Fatal(err)
+	}
+	if cj.Spec.JobTemplate.Spec.Template.Spec.Containers[1].Name != "redisdump" {
+		t.Errorf("dump container=%q", cj.Spec.JobTemplate.Spec.Template.Spec.Containers[1].Name)
 	}
 }

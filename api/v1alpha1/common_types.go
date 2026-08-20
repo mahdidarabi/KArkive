@@ -6,7 +6,6 @@ import (
 )
 
 // Engine identifies the datastore being backed up or restored.
-// MariaDB and Redis are reserved for later phases; only postgres is implemented today.
 // +kubebuilder:validation:Enum=postgres;mariadb;redis
 type Engine string
 
