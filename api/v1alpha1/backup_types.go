@@ -15,9 +15,9 @@ type BackupImages struct {
 	Postgres *ImageSpec `json:"postgres,omitempty"`
 	// Mc is the minio client image used for s3-sync.
 	Mc *ImageSpec `json:"mc,omitempty"`
-	// MariaDB is reserved for a later phase (mysqldump).
+	// MariaDB is used for mysqldump / mysql restore.
 	MariaDB *ImageSpec `json:"mariadb,omitempty"`
-	// Redis is reserved for a later phase (redis-cli --rdb).
+	// Redis is used for redis-cli --rdb dump and restore.
 	Redis *ImageSpec `json:"redis,omitempty"`
 }
 
@@ -32,7 +32,7 @@ type BackupResources struct {
 
 // BackupSpec defines the desired state of Backup.
 type BackupSpec struct {
-	// Engine of the source datastore. Only postgres is reconciled in this phase.
+	// Engine of the source datastore.
 	// +kubebuilder:default=postgres
 	Engine Engine `json:"engine,omitempty"`
 
@@ -104,6 +104,9 @@ type BackupStatus struct {
 	// LastSuccessfulTime copied from the CronJob.
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 
+	// LastJob is the most recently finished Job, including failure reason.
+	LastJob *LastJobStatus `json:"lastJob,omitempty"`
+
 	// Conditions of the Backup. Type Ready is always set after a reconcile.
 	// +listType=map
 	// +listMapKey=type
@@ -119,6 +122,7 @@ type BackupStatus struct {
 // +kubebuilder:printcolumn:name="Schedule",type=string,JSONPath=".spec.schedule"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Last Success",type=date,JSONPath=".status.lastSuccessfulTime"
+// +kubebuilder:printcolumn:name="Last Job",type=string,JSONPath=".status.lastJob.outcome"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
 // Backup describes a scheduled logical backup pipeline (dump → gzip → gpg → S3).

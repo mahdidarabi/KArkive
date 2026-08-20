@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "karkive.fullname" . }}
+  name: {{ include "karkive.operatorName" . }}
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "karkive.labels" . | nindent 4 }}
@@ -29,7 +29,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: manager
+        - name: karkive-operator
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
@@ -48,6 +48,7 @@ spec:
             {{- if .Values.defaults.s3.bucket }}
             - --default-s3-bucket={{ .Values.defaults.s3.bucket }}
             {{- end }}
+            - --webhooks={{ .Values.webhook.enabled }}
           {{- if .Values.watchNamespace }}
           env:
             - name: WATCH_NAMESPACE
@@ -58,6 +59,10 @@ spec:
               containerPort: {{ .Values.metrics.port }}
             - name: health
               containerPort: {{ .Values.probes.port }}
+            {{- if .Values.webhook.enabled }}
+            - name: webhook
+              containerPort: 9443
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -68,6 +73,12 @@ spec:
               port: health
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.webhook.enabled }}
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+          {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -77,3 +88,9 @@ spec:
             runAsUser: 65532
             seccompProfile:
               type: RuntimeDefault
+      {{- if .Values.webhook.enabled }}
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: {{ include "karkive.webhookSecretName" . }}
+      {{- end }}

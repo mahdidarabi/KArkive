@@ -116,3 +116,124 @@ func TestRestoreReconcile_CreatesOwnedResources(t *testing.T) {
 		t.Errorf("ready condition=%v", cond)
 	}
 }
+
+func TestRestoreReconcile_DoesNotRecreateWhileDeleting(t *testing.T) {
+	scheme := testScheme(t)
+	now := metav1.Now()
+	restore := &karkivev1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "app-postgres",
+			Namespace:         "backup",
+			DeletionTimestamp: &now,
+			Finalizers:        []string{"foregroundDeletion"},
+		},
+		Spec: karkivev1alpha1.RestoreSpec{
+			Engine:   karkivev1alpha1.EnginePostgres,
+			Schedule: "30 2 * * *",
+			Database: karkivev1alpha1.DatabaseSpec{Host: "postgres.example.svc.cluster.local", Name: "app"},
+			S3: karkivev1alpha1.S3Spec{
+				Endpoint: "https://s3.example.com",
+				Bucket:   "backups",
+				Path:     "app/pgdump",
+			},
+			SecretRef:      corev1.LocalObjectReference{Name: "restore-creds"},
+			PostgresSecret: &karkivev1alpha1.SecretKeySelector{Name: "postgres"},
+			Persistence:    &karkivev1alpha1.PersistenceSpec{Enabled: ptr.To(false)},
+		},
+	}
+	jobSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "restore-creds", Namespace: "backup"},
+		Data: map[string][]byte{
+			"s3_access_key":  []byte("ak"),
+			"s3_secret_key":  []byte("sk"),
+			"gpg_passphrase": []byte("pgp"),
+		},
+	}
+	dbSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "postgres", Namespace: "backup"},
+		Data: map[string][]byte{
+			"username": []byte("app"),
+			"password": []byte("secret"),
+		},
+	}
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(restore, jobSecret, dbSecret).
+		WithStatusSubresource(&karkivev1alpha1.Restore{}).
+		Build()
+	r := &RestoreReconciler{
+		Client:   c,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(8),
+	}
+	if _, err := r.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: restore.Name, Namespace: restore.Namespace},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	owned := resources.RestoreOwnedName(restore)
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: restore.Namespace, Name: owned}, &batchv1.CronJob{}); err == nil {
+		t.Fatal("expected no CronJob while Restore is terminating")
+	}
+}
+
+func TestRestoreReconcile_MariaDBCreatesOwnedResources(t *testing.T) {
+	scheme := testScheme(t)
+	restore := &karkivev1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{Name: "app-mariadb", Namespace: "backup"},
+		Spec: karkivev1alpha1.RestoreSpec{
+			Engine:   karkivev1alpha1.EngineMariaDB,
+			Schedule: "30 2 * * *",
+			Database: karkivev1alpha1.DatabaseSpec{Host: "mariadb.example.svc.cluster.local", Name: "app"},
+			S3: karkivev1alpha1.S3Spec{
+				Endpoint: "https://s3.example.com",
+				Bucket:   "backups",
+				Path:     "app/mysqldump",
+			},
+			SecretRef:     corev1.LocalObjectReference{Name: "restore-creds"},
+			MariaDBSecret: &karkivev1alpha1.SecretKeySelector{Name: "mariadb"},
+			Persistence:   &karkivev1alpha1.PersistenceSpec{Enabled: ptr.To(false)},
+		},
+	}
+	jobSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "restore-creds", Namespace: "backup"},
+		Data: map[string][]byte{
+			"s3_access_key":  []byte("ak"),
+			"s3_secret_key":  []byte("sk"),
+			"gpg_passphrase": []byte("pgp"),
+		},
+	}
+	dbSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "mariadb", Namespace: "backup"},
+		Data: map[string][]byte{
+			"username": []byte("root"),
+			"password": []byte("secret"),
+		},
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(restore, jobSecret, dbSecret).
+		WithStatusSubresource(&karkivev1alpha1.Restore{}).
+		Build()
+	r := &RestoreReconciler{
+		Client:   c,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(16),
+		Config:   config.Config{},
+	}
+	_, err := r.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: restore.Name, Namespace: restore.Namespace},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cj := &batchv1.CronJob{}
+	owned := resources.RestoreOwnedName(restore)
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: restore.Namespace, Name: owned}, cj); err != nil {
+		t.Fatal(err)
+	}
+	if cj.Spec.JobTemplate.Spec.Template.Spec.Containers[4].Name != "mysqlrestore" {
+		t.Errorf("restore container=%q", cj.Spec.JobTemplate.Spec.Template.Spec.Containers[4].Name)
+	}
+}

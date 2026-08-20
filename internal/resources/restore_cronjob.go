@@ -11,22 +11,19 @@ import (
 	"github.com/mahdidarabi/Karkive/internal/ptr"
 )
 
-// MutateRestoreCronJob writes the postgres restore pipeline CronJob.
-// Stage order: cleanup → fetch → decrypt → extract → pgrestore.
+// MutateRestoreCronJob writes the restore pipeline CronJob.
+// Stage order: cleanup → fetch → decrypt → extract → restore.
 func MutateRestoreCronJob(cj *batchv1.CronJob, restore *karkivev1alpha1.Restore, cfg config.Config) {
-	engine := EffectiveEngine(restore.Spec.Engine)
 	job := restore.Spec.Job
 	if job == nil {
 		job = &karkivev1alpha1.JobPolicy{}
 	}
 
-	pgImage, pgPull := restorePostgresImage(restore, cfg)
 	busyImg, busyPull := restoreBusyBoxImage(restore, cfg)
 	gpgImg, gpgPull := restoreGnuPGImage(restore, cfg)
 	mcImg, mcPull := restoreMcImage(restore, cfg)
 	cleanupRes, fetchRes, decryptRes, extractRes, restoreRes := restoreStageResources(restore)
 	secret := restoreSecretName(restore)
-	pgSecret, pgUserKey, pgPassKey := RestorePostgresSecret(restore)
 	owned := RestoreOwnedName(restore)
 	cmName := owned
 	labels := RestoreLabels(restore)
@@ -61,7 +58,7 @@ func MutateRestoreCronJob(cj *batchv1.CronJob, restore *karkivev1alpha1.Restore,
 				Security: ToolsSecurityContext(), TmpSubPath: "extract-tmp",
 				Volume: volumeWorkdir, MountPath: workdir,
 			}),
-			pgrestoreContainer(engine, pgImage, pgPull, restoreRes, cmName, pgSecret, pgUserKey, pgPassKey, workdir),
+			restoreEngineContainer(restore, cfg, restoreRes, cmName, workdir),
 		},
 		Volumes: restoreVolumes(restore, secret),
 	}
@@ -122,26 +119,60 @@ func restoreDecryptContainer(image string, pull corev1.PullPolicy, res corev1.Re
 	return c
 }
 
-func pgrestoreContainer(
-	engine karkivev1alpha1.Engine,
-	pgImage string,
-	pgPull corev1.PullPolicy,
+func restoreEngineContainer(
+	restore *karkivev1alpha1.Restore,
+	cfg config.Config,
 	res corev1.ResourceRequirements,
-	cmName, secret, userKey, passKey, workdir string,
+	cmName, workdir string,
 ) corev1.Container {
-	_ = engine
-	c := newScriptContainer(scriptOpts{
-		Name: "pgrestore", Image: pgImage, Pull: pgPull,
-		Script:    pipeline.MustRestoreScript("pgrestore.sh"),
-		ConfigMap: cmName, Resources: res,
-		Security: PostgresSecurityContext(), TmpSubPath: "pgrestore-tmp",
-		Volume: volumeWorkdir, MountPath: workdir,
-	})
-	c.Env = append(c.Env,
-		secretEnv("PGUSER", secret, userKey),
-		secretEnv("PGPASSWORD", secret, passKey),
-	)
-	return c
+	engine := EffectiveEngine(restore.Spec.Engine)
+	switch engine {
+	case karkivev1alpha1.EngineMariaDB:
+		img, pull := restoreMariaDBImage(restore, cfg)
+		name, userKey, passKey := RestoreMariaDBSecret(restore)
+		c := newScriptContainer(scriptOpts{
+			Name: "mysqlrestore", Image: img, Pull: pull,
+			Script:    pipeline.MustRestoreScript("mysqlrestore.sh"),
+			ConfigMap: cmName, Resources: res,
+			Security: MariaDBSecurityContext(), TmpSubPath: "mysqlrestore-tmp",
+			Volume: volumeWorkdir, MountPath: workdir,
+		})
+		c.Env = append(c.Env,
+			secretEnv("MYSQL_USER", name, userKey),
+			secretEnv("MYSQL_PASSWORD", name, passKey),
+		)
+		return c
+	case karkivev1alpha1.EngineRedis:
+		img, pull := restoreRedisImage(restore, cfg)
+		name, userKey, passKey := RestoreRedisSecret(restore)
+		c := newScriptContainer(scriptOpts{
+			Name: "redisrestore", Image: img, Pull: pull,
+			Script:    pipeline.MustRestoreScript("redisrestore.sh"),
+			ConfigMap: cmName, Resources: res,
+			Security: RedisSecurityContext(), TmpSubPath: "redisrestore-tmp",
+			Volume: volumeWorkdir, MountPath: workdir,
+		})
+		c.Env = append(c.Env,
+			secretEnv("REDIS_USERNAME", name, userKey),
+			secretEnv("REDIS_PASSWORD", name, passKey),
+		)
+		return c
+	default:
+		img, pull := restorePostgresImage(restore, cfg)
+		name, userKey, passKey := RestorePostgresSecret(restore)
+		c := newScriptContainer(scriptOpts{
+			Name: "pgrestore", Image: img, Pull: pull,
+			Script:    pipeline.MustRestoreScript("pgrestore.sh"),
+			ConfigMap: cmName, Resources: res,
+			Security: PostgresSecurityContext(), TmpSubPath: "pgrestore-tmp",
+			Volume: volumeWorkdir, MountPath: workdir,
+		})
+		c.Env = append(c.Env,
+			secretEnv("PGUSER", name, userKey),
+			secretEnv("PGPASSWORD", name, passKey),
+		)
+		return c
+	}
 }
 
 func restoreVolumes(restore *karkivev1alpha1.Restore, secret string) []corev1.Volume {

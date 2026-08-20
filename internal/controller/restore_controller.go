@@ -14,6 +14,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
@@ -39,6 +40,7 @@ type RestoreReconciler struct {
 // +kubebuilder:rbac:groups=karkive.io,resources=restores/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=karkive.io,resources=restores/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
@@ -52,15 +54,20 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if !restore.DeletionTimestamp.IsZero() {
+		logger.Info("Restore is deleting; not recreating owned resources")
+		return ctrl.Result{}, nil
+	}
+
 	if !resources.EngineImplemented(restore.Spec.Engine) {
 		engine := resources.EffectiveEngine(restore.Spec.Engine)
-		msg := fmt.Sprintf("engine %q is not implemented yet (postgres backup and restore are implemented)", engine)
+		msg := fmt.Sprintf("engine %q is not implemented", engine)
 		logger.Info(msg)
 		r.Recorder.Event(restore, corev1.EventTypeWarning, "UnsupportedEngine", msg)
 		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseUnsupported, metav1.ConditionFalse, "UnsupportedEngine", msg)
 	}
 
-	if err := validateRestoreSpec(restore); err != nil {
+	if err := karkivev1alpha1.ValidateRestoreSpec(restore.Spec); err != nil {
 		r.Recorder.Event(restore, corev1.EventTypeWarning, "InvalidSpec", err.Error())
 		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "InvalidSpec", err.Error())
 	}
@@ -78,18 +85,18 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "SecretInvalid", err.Error())
 	}
 
-	if err := r.ensurePostgresSecret(ctx, restore); err != nil {
+	if err := r.ensureTargetSecret(ctx, restore); err != nil {
 		if apierrors.IsNotFound(err) {
-			name, _, _ := resources.RestorePostgresSecret(restore)
-			msg := fmt.Sprintf("postgres secret %q not found", name)
-			r.Recorder.Event(restore, corev1.EventTypeWarning, "PostgresSecretNotFound", msg)
-			if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhasePending, metav1.ConditionFalse, "PostgresSecretNotFound", msg); statusErr != nil {
+			name, _, _ := resources.RestoreTargetSecret(restore)
+			msg := fmt.Sprintf("target secret %q not found", name)
+			r.Recorder.Event(restore, corev1.EventTypeWarning, "TargetSecretNotFound", msg)
+			if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhasePending, metav1.ConditionFalse, "TargetSecretNotFound", msg); statusErr != nil {
 				return ctrl.Result{}, statusErr
 			}
 			return ctrl.Result{RequeueAfter: secretRequeue}, nil
 		}
-		r.Recorder.Event(restore, corev1.EventTypeWarning, "PostgresSecretInvalid", err.Error())
-		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "PostgresSecretInvalid", err.Error())
+		r.Recorder.Event(restore, corev1.EventTypeWarning, "TargetSecretInvalid", err.Error())
+		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "TargetSecretInvalid", err.Error())
 	}
 
 	if err := r.ensureConfigMap(ctx, restore); err != nil {
@@ -98,13 +105,9 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := r.ensurePVC(ctx, restore); err != nil {
 		return ctrl.Result{}, r.fail(ctx, restore, "PVCError", err)
 	}
-	if err := r.ensureCronJob(ctx, restore); err != nil {
+	cron, err := r.ensureCronJob(ctx, restore)
+	if err != nil {
 		return ctrl.Result{}, r.fail(ctx, restore, "CronJobError", err)
-	}
-
-	cron := &batchv1.CronJob{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: restore.Namespace, Name: resources.RestoreOwnedName(restore)}, cron); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	restore.Status.CronJobName = cron.Name
@@ -123,28 +126,6 @@ func (r *RestoreReconciler) fail(ctx context.Context, restore *karkivev1alpha1.R
 	return err
 }
 
-func validateRestoreSpec(restore *karkivev1alpha1.Restore) error {
-	if restore.Spec.Schedule == "" {
-		return fmt.Errorf("spec.schedule is required")
-	}
-	if restore.Spec.Database.Host == "" {
-		return fmt.Errorf("spec.database.host is required")
-	}
-	if restore.Spec.Database.Name == "" {
-		return fmt.Errorf("spec.database.name is required")
-	}
-	if restore.Spec.S3.Path == "" {
-		return fmt.Errorf("spec.s3.path is required")
-	}
-	if restore.Spec.SecretRef.Name == "" {
-		return fmt.Errorf("spec.secretRef.name is required")
-	}
-	if restore.Spec.PostgresSecret == nil || restore.Spec.PostgresSecret.Name == "" {
-		return fmt.Errorf("spec.postgresSecret.name is required")
-	}
-	return nil
-}
-
 func (r *RestoreReconciler) ensureJobSecret(ctx context.Context, restore *karkivev1alpha1.Restore) error {
 	secret := &corev1.Secret{}
 	key := client.ObjectKey{Namespace: restore.Namespace, Name: restore.Spec.SecretRef.Name}
@@ -159,8 +140,8 @@ func (r *RestoreReconciler) ensureJobSecret(ctx context.Context, restore *karkiv
 	return nil
 }
 
-func (r *RestoreReconciler) ensurePostgresSecret(ctx context.Context, restore *karkivev1alpha1.Restore) error {
-	name, userKey, passKey := resources.RestorePostgresSecret(restore)
+func (r *RestoreReconciler) ensureTargetSecret(ctx context.Context, restore *karkivev1alpha1.Restore) error {
+	name, userKey, passKey := resources.RestoreTargetSecret(restore)
 	secret := &corev1.Secret{}
 	key := client.ObjectKey{Namespace: restore.Namespace, Name: name}
 	if err := r.Get(ctx, key, secret); err != nil {
@@ -168,7 +149,7 @@ func (r *RestoreReconciler) ensurePostgresSecret(ctx context.Context, restore *k
 	}
 	for _, k := range []string{userKey, passKey} {
 		if _, ok := secret.Data[k]; !ok {
-			return fmt.Errorf("postgres secret %q is missing key %q", secret.Name, k)
+			return fmt.Errorf("target secret %q is missing key %q", secret.Name, k)
 		}
 	}
 	return nil
@@ -181,7 +162,7 @@ func (r *RestoreReconciler) ensureConfigMap(ctx context.Context, restore *karkiv
 		if err := resources.MutateRestoreConfigMap(cm, restore, r.Config); err != nil {
 			return err
 		}
-		return controllerutil.SetControllerReference(restore, cm, r.Scheme)
+		return controllerutil.SetControllerReference(restore, cm, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 	})
 	return err
 }
@@ -195,22 +176,22 @@ func (r *RestoreReconciler) ensurePVC(ctx context.Context, restore *karkivev1alp
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, pvc, func() error {
 		if !pvc.CreationTimestamp.IsZero() {
 			pvc.Labels = resources.RestoreLabels(restore)
-			return controllerutil.SetControllerReference(restore, pvc, r.Scheme)
+			return controllerutil.SetControllerReference(restore, pvc, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 		}
 		resources.MutateRestorePVC(pvc, restore)
-		return controllerutil.SetControllerReference(restore, pvc, r.Scheme)
+		return controllerutil.SetControllerReference(restore, pvc, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 	})
 	return err
 }
 
-func (r *RestoreReconciler) ensureCronJob(ctx context.Context, restore *karkivev1alpha1.Restore) error {
+func (r *RestoreReconciler) ensureCronJob(ctx context.Context, restore *karkivev1alpha1.Restore) (*batchv1.CronJob, error) {
 	owned := resources.RestoreOwnedName(restore)
 	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: restore.Namespace}}
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cj, func() error {
 		resources.MutateRestoreCronJob(cj, restore, r.Config)
-		return controllerutil.SetControllerReference(restore, cj, r.Scheme)
+		return controllerutil.SetControllerReference(restore, cj, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 	})
-	return err
+	return cj, err
 }
 
 func (r *RestoreReconciler) setStatus(
@@ -220,6 +201,7 @@ func (r *RestoreReconciler) setStatus(
 	ready metav1.ConditionStatus,
 	reason, message string,
 ) error {
+	restore.Status.LastJob = lastJobStatus(ctx, r.Client, restore.Namespace, resources.LabelRestoreName, restore.Name, resources.KindRestore)
 	restore.Status.Phase = phase
 	restore.Status.ObservedGeneration = restore.Generation
 	meta.SetStatusCondition(&restore.Status.Conditions, metav1.Condition{
@@ -238,5 +220,6 @@ func (r *RestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.CronJob{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(mapJobToOwner(resources.KindRestore, resources.LabelRestoreName))).
 		Complete(r)
 }

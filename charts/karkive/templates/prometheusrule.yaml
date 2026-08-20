@@ -31,19 +31,21 @@ spec:
             summary: Restore {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} is not Ready
             description: The Restore CR has not been Ready for 15m (engine={{`{{ $labels.engine }}`}}).
         - alert: KarkiveBackupJobFailed
-          expr: karkive_backup_last_job_failed == 1
+          expr: karkive_backup_last_job_info{outcome="Failed"} == 1
           for: 15m
           labels:
             severity: warning
           annotations:
             summary: Last backup Job failed for {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}}
+            description: Job {{`{{ $labels.job_name }}`}} failed (reason={{`{{ $labels.reason }}`}}, engine={{`{{ $labels.engine }}`}}).
         - alert: KarkiveRestoreJobFailed
-          expr: karkive_restore_last_job_failed == 1
+          expr: karkive_restore_last_job_info{outcome="Failed"} == 1
           for: 15m
           labels:
             severity: warning
           annotations:
             summary: Last restore Job failed for {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}}
+            description: Job {{`{{ $labels.job_name }}`}} failed (reason={{`{{ $labels.reason }}`}}, engine={{`{{ $labels.engine }}`}}).
         - alert: KarkiveBackupStale
           expr: |-
             karkive_backup_suspended == 0

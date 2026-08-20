@@ -26,7 +26,7 @@ type RestoreResources struct {
 
 // RestoreSpec defines the desired state of Restore.
 type RestoreSpec struct {
-	// Engine of the restore target. Only postgres is implemented.
+	// Engine of the restore target.
 	// +kubebuilder:default=postgres
 	Engine Engine `json:"engine,omitempty"`
 
@@ -50,10 +50,10 @@ type RestoreSpec struct {
 	// PostgresSecret is the sandbox Cluster Secret (PGUSER/PGPASSWORD).
 	PostgresSecret *SecretKeySelector `json:"postgresSecret,omitempty"`
 
-	// MariaDBSecret is reserved for a later phase.
+	// MariaDBSecret is the target MariaDB Secret (MYSQL_USER / MYSQL_PASSWORD).
 	MariaDBSecret *SecretKeySelector `json:"mariadbSecret,omitempty"`
 
-	// RedisSecret is reserved for a later phase.
+	// RedisSecret is the target Redis Secret (username optional ACL, password).
 	RedisSecret *SecretKeySelector `json:"redisSecret,omitempty"`
 
 	// Persistence for the restore workdir. Set enabled=false for lite (emptyDir) restores.
@@ -107,6 +107,8 @@ type RestoreStatus struct {
 	CronJobName        string       `json:"cronJobName,omitempty"`
 	LastScheduleTime   *metav1.Time `json:"lastScheduleTime,omitempty"`
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
+	// LastJob is the most recently finished Job, including failure reason.
+	LastJob *LastJobStatus `json:"lastJob,omitempty"`
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -118,6 +120,7 @@ type RestoreStatus struct {
 // +kubebuilder:printcolumn:name="Engine",type=string,JSONPath=".spec.engine"
 // +kubebuilder:printcolumn:name="Schedule",type=string,JSONPath=".spec.schedule"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="Last Job",type=string,JSONPath=".status.lastJob.outcome"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
 // Restore describes a scheduled logical restore pipeline (S3 → decrypt → extract → restore).

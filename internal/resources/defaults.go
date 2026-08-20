@@ -206,6 +206,18 @@ func gnuPGImage(backup *karkivev1alpha1.Backup, cfg config.Config) (string, core
 	}), cfg.GnuPGImage, config.DefaultGnuPGImage)
 }
 
+func mariadbImage(backup *karkivev1alpha1.Backup, cfg config.Config) (string, corev1.PullPolicy) {
+	return resolveImage(imageOverride(backup, func(i *karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec {
+		return i.MariaDB
+	}), cfg.MariaDBImage, config.DefaultMariaDBImage)
+}
+
+func redisImage(backup *karkivev1alpha1.Backup, cfg config.Config) (string, corev1.PullPolicy) {
+	return resolveImage(imageOverride(backup, func(i *karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec {
+		return i.Redis
+	}), cfg.RedisImage, config.DefaultRedisImage)
+}
+
 func restorePostgresImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
 	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
 		return i.Postgres
@@ -228,6 +240,18 @@ func restoreGnuPGImage(restore *karkivev1alpha1.Restore, cfg config.Config) (str
 	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
 		return i.GnuPG
 	}), cfg.GnuPGImage, config.DefaultGnuPGImage)
+}
+
+func restoreMariaDBImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
+	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
+		return i.MariaDB
+	}), cfg.MariaDBImage, config.DefaultMariaDBImage)
+}
+
+func restoreRedisImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
+	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
+		return i.Redis
+	}), cfg.RedisImage, config.DefaultRedisImage)
 }
 
 func restoreImageOverride(restore *karkivev1alpha1.Restore, pick func(*karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec) *karkivev1alpha1.ImageSpec {
@@ -320,8 +344,31 @@ func restoreSecretName(restore *karkivev1alpha1.Restore) string {
 }
 
 func RestorePostgresSecret(restore *karkivev1alpha1.Restore) (name, userKey, passKey string) {
-	name, userKey, passKey = "postgres", "username", "password"
-	if s := restore.Spec.PostgresSecret; s != nil {
+	return restoreSecretKeys(restore.Spec.PostgresSecret, "postgres")
+}
+
+func RestoreMariaDBSecret(restore *karkivev1alpha1.Restore) (name, userKey, passKey string) {
+	return restoreSecretKeys(restore.Spec.MariaDBSecret, "mariadb")
+}
+
+func RestoreRedisSecret(restore *karkivev1alpha1.Restore) (name, userKey, passKey string) {
+	return restoreSecretKeys(restore.Spec.RedisSecret, "redis")
+}
+
+func RestoreTargetSecret(restore *karkivev1alpha1.Restore) (name, userKey, passKey string) {
+	switch EffectiveEngine(restore.Spec.Engine) {
+	case karkivev1alpha1.EngineMariaDB:
+		return RestoreMariaDBSecret(restore)
+	case karkivev1alpha1.EngineRedis:
+		return RestoreRedisSecret(restore)
+	default:
+		return RestorePostgresSecret(restore)
+	}
+}
+
+func restoreSecretKeys(s *karkivev1alpha1.SecretKeySelector, defaultName string) (name, userKey, passKey string) {
+	name, userKey, passKey = defaultName, "username", "password"
+	if s != nil {
 		if s.Name != "" {
 			name = s.Name
 		}

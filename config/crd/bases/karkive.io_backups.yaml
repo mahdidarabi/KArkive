@@ -29,6 +29,9 @@ spec:
     - jsonPath: .status.lastSuccessfulTime
       name: Last Success
       type: date
+    - jsonPath: .status.lastJob.outcome
+      name: Last Job
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -94,8 +97,7 @@ spec:
                 type: object
               engine:
                 default: postgres
-                description: Engine of the source datastore. Only postgres is reconciled
-                  in this phase.
+                description: Engine of the source datastore.
                 enum:
                 - postgres
                 - mariadb
@@ -125,7 +127,7 @@ spec:
                         type: string
                     type: object
                   mariadb:
-                    description: MariaDB is reserved for a later phase (mysqldump).
+                    description: MariaDB is used for mysqldump / mysql restore.
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -155,7 +157,7 @@ spec:
                         type: string
                     type: object
                   redis:
-                    description: Redis is reserved for a later phase (redis-cli --rdb).
+                    description: Redis is used for redis-cli --rdb dump and restore.
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -669,6 +671,33 @@ spec:
               cronJobName:
                 description: CronJobName is the owned CronJob.
                 type: string
+              lastJob:
+                description: LastJob is the most recently finished Job, including
+                  failure reason.
+                properties:
+                  completionTime:
+                    description: CompletionTime when the Job finished (or the condition
+                      transition time).
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message from that condition.
+                    type: string
+                  name:
+                    description: Name of the Job.
+                    type: string
+                  outcome:
+                    description: Outcome is Succeeded or Failed.
+                    type: string
+                  reason:
+                    description: Reason from the JobComplete or JobFailed condition
+                      (e.g. BackoffLimitExceeded).
+                    type: string
+                  startTime:
+                    description: StartTime of the Job.
+                    format: date-time
+                    type: string
+                type: object
               lastScheduleTime:
                 description: LastScheduleTime copied from the CronJob.
                 format: date-time

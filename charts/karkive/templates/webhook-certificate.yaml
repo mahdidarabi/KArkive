@@ -1,0 +1,45 @@
+{{- if and .Values.webhook.enabled .Values.webhook.certManager.enabled }}
+{{- $svc := include "karkive.webhookServiceName" . }}
+{{- $ns := .Release.Namespace }}
+{{- $issuer := .Values.webhook.certManager.issuerRef | default dict }}
+{{- if not $issuer.name }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "karkive.webhookIssuerName" . }}
+  namespace: {{ $ns | quote }}
+  labels:
+    {{- include "karkive.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+{{- end }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "karkive.webhookCertificateName" . }}
+  namespace: {{ $ns | quote }}
+  labels:
+    {{- include "karkive.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "karkive.webhookSecretName" . }}
+  duration: {{ .Values.webhook.certManager.duration | quote }}
+  renewBefore: {{ .Values.webhook.certManager.renewBefore | quote }}
+  commonName: {{ printf "%s.%s.svc" $svc $ns | quote }}
+  dnsNames:
+    - {{ $svc | quote }}
+    - {{ printf "%s.%s.svc" $svc $ns | quote }}
+    - {{ printf "%s.%s.svc.cluster.local" $svc $ns | quote }}
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  issuerRef:
+    {{- if $issuer.name }}
+    {{- toYaml $issuer | nindent 4 }}
+    {{- else }}
+    group: cert-manager.io
+    kind: Issuer
+    name: {{ include "karkive.webhookIssuerName" . }}
+    {{- end }}
+{{- end }}

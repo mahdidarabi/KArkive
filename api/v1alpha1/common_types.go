@@ -3,10 +3,10 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Engine identifies the datastore being backed up or restored.
-// MariaDB and Redis are reserved for later phases; only postgres is implemented today.
 // +kubebuilder:validation:Enum=postgres;mariadb;redis
 type Engine string
 
@@ -121,4 +121,30 @@ type JobPolicy struct {
 
 	// TimeZone for the CronJob schedule (Kubernetes 1.27+).
 	TimeZone string `json:"timeZone,omitempty"`
+}
+
+const (
+	LastJobOutcomeSucceeded = "Succeeded"
+	LastJobOutcomeFailed    = "Failed"
+)
+
+// LastJobStatus is the most recently finished Job for a Backup or Restore.
+type LastJobStatus struct {
+	// Name of the Job.
+	Name string `json:"name,omitempty"`
+
+	// Outcome is Succeeded or Failed.
+	Outcome string `json:"outcome,omitempty"`
+
+	// Reason from the JobComplete or JobFailed condition (e.g. BackoffLimitExceeded).
+	Reason string `json:"reason,omitempty"`
+
+	// Message from that condition.
+	Message string `json:"message,omitempty"`
+
+	// StartTime of the Job.
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+
+	// CompletionTime when the Job finished (or the condition transition time).
+	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
 }

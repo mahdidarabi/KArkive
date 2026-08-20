@@ -18,6 +18,23 @@ leaderElection: true
 # Empty = watch all namespaces.
 watchNamespace: ""
 
+# Validating admission webhooks for Backup / Restore specs.
+# Disabled for `make run`; the chart enables them and mounts serving certs.
+webhook:
+  enabled: true
+  # GitOps: set enabled true so Helm does not generate a random serving cert.
+  # cert-manager must already be in the cluster. Switching from the
+  # Helm-generated Secret: delete it once so cert-manager can create it.
+  certManager:
+    enabled: false
+    duration: 8760h
+    renewBefore: 720h
+    # Empty = chart creates a self-signed Issuer in the release namespace.
+    issuerRef: {}
+    #   name: my-issuer
+    #   kind: ClusterIssuer
+    #   group: cert-manager.io
+
 defaults:
   # cleanup + compress (find, gzip)
   busyboxImage: docker.io/library/busybox:1.37
@@ -62,6 +79,12 @@ metrics:
     enabled: false
     labels:
       grafana_dashboard: "1"
+    # Folder path for the Grafana sidecar. Written under folderKey as an
+    # annotation (nested paths like Platform/Karkive are kept) and as a
+    # label (`/` becomes `-`, Kubernetes label values cannot contain `/`).
+    # Set folderKey to match Grafana sidecar.dashboards.folderAnnotation.
+    folder: ""
+    folderKey: grafana_folder
     annotations: {}
 
 probes:

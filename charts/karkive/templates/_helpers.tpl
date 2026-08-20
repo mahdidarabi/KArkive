@@ -29,10 +29,30 @@ app.kubernetes.io/name: {{ include "karkive.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "karkive.operatorName" -}}
+{{- printf "%s-operator" (include "karkive.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{- define "karkive.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
 {{- default (include "karkive.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
+{{- end }}
+
+{{- define "karkive.webhookServiceName" -}}
+{{- printf "%s-webhook" (include "karkive.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "karkive.webhookSecretName" -}}
+{{- printf "%s-tls" (include "karkive.webhookServiceName" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "karkive.webhookCertificateName" -}}
+{{- printf "%s-webhook" (include "karkive.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "karkive.webhookIssuerName" -}}
+{{- printf "%s-webhook-selfsigned" (include "karkive.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}

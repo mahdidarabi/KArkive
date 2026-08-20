@@ -4,7 +4,7 @@
 
 - [x] Go module and project layout (`cmd`, `api`, `internal`, Helm)
 - [x] `Backup` and `Restore` CRDs (`karkive.io/v1alpha1`)
-- [x] Engine enum: `postgres` / `mariadb` / `redis` (API reserved)
+- [x] Engine enum: `postgres` / `mariadb` / `redis`
 - [x] Generate deepcopy and CRD/RBAC manifests (`make generate manifests`)
 - [x] Owned resource prefix: `karkive-<cr-name>`
 - [x] `app.kubernetes.io/component` from `spec.component` (defaults to CR name)
@@ -43,17 +43,22 @@
 - [x] Alerts for missed schedules and failed Jobs
 - [x] Grafana dashboard
 
-## Later engines
+## MariaDB
 
-- [ ] MariaDB backup (`mysqldump`)
-- [ ] MariaDB restore
-- [ ] Redis backup (`redis-cli --rdb`)
-- [ ] Redis restore
+- [x] Pipeline scripts: `cleanup` → `mysqldump` → `compress` → `encrypt` → `s3-sync`
+- [x] Restore: `cleanup` → `fetch` → `decrypt` → `extract` → `mysqlrestore`
+- [x] `spec.mariadbSecret` for target DB credentials
+
+## Redis
+
+- [x] Backup: `redis-cli --rdb`
+- [x] Restore: load RDB locally and `MIGRATE` keys (`FLUSHALL` when `dropDatabaseIfExists`)
+- [x] `spec.redisSecret` for target credentials
 
 ## Later
 
-- [ ] Validating webhooks for Backup/Restore
+- [x] Validating webhooks for Backup/Restore
 - [x] CI (tests + image build)
 - [x] Publish the operator image to GHCR
-- [ ] Publish the Helm chart
-- [ ] Richer status from the last Job (success/failure, failure reason)
+- [x] Publish the Helm chart
+- [x] Richer status from the last Job (success/failure, failure reason)
