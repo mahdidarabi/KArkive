@@ -66,9 +66,9 @@ Helm charts are pushed to GHCR on tags `v*` (`Chart.yaml` `version` and
 `appVersion` must match the tag without the `v` prefix):
 
 ```bash
-helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.1-alpha.2
+helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.1-alpha.4
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.1-alpha.2 \
+  --version 0.0.1-alpha.4 \
   -n karkive-system --create-namespace
 ```
 
