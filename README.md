@@ -56,6 +56,11 @@ Invalid CRs are rejected at admission when the Helm chart's validating
 webhooks are enabled (cron schedule, required fields, engine secrets).
 `make run` does not start webhooks.
 
+For GitOps, set `webhook.certManager.enabled=true` so serving certs come
+from cert-manager instead of Helm `genCA` (which changes on every template).
+cert-manager must already be installed. If you previously used the
+Helm-generated Secret, delete it once so cert-manager can create it.
+
 ## Develop
 
 ```bash
@@ -74,9 +79,9 @@ charts are pushed to GHCR on tags `v*` (`Chart.yaml` `version` and
 `appVersion` must match the tag without the `v` prefix).
 
 ```bash
-helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.1-alpha.10
+helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.1-alpha.11
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.1-alpha.10 \
+  --version 0.0.1-alpha.11 \
   -n karkive-system --create-namespace
 ```
 
@@ -85,11 +90,21 @@ scrape, alerting rules, and a Grafana dashboard ConfigMap are off by default:
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.1-alpha.10 \
+  --version 0.0.1-alpha.11 \
   -n karkive-system --create-namespace \
   --set metrics.serviceMonitor.enabled=true \
   --set metrics.prometheusRule.enabled=true \
   --set metrics.grafanaDashboard.enabled=true
+```
+
+Webhook serving certs default to Helm-generated TLS. On GitOps (Argo CD),
+prefer cert-manager:
+
+```bash
+helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
+  --version 0.0.1-alpha.11 \
+  -n karkive-system --create-namespace \
+  --set webhook.certManager.enabled=true
 ```
 
 ## Roadmap

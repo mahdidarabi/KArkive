@@ -2,12 +2,15 @@
 {{- $svc := include "karkive.webhookServiceName" . }}
 {{- $ns := .Release.Namespace }}
 {{- $secretName := include "karkive.webhookSecretName" . }}
+{{- $useCM := .Values.webhook.certManager.enabled }}
+{{- $caCrt := "" }}
+{{- if not $useCM }}
 {{- $ca := genCA "karkive-webhook-ca" 3650 }}
 {{- $altNames := list $svc (printf "%s.%s.svc" $svc $ns) (printf "%s.%s.svc.cluster.local" $svc $ns) }}
 {{- $cert := genSignedCert $svc nil $altNames 3650 $ca }}
 {{- $crt := $cert.Cert }}
 {{- $key := $cert.Key }}
-{{- $caCrt := $ca.Cert }}
+{{- $caCrt = $ca.Cert }}
 {{- $existing := lookup "v1" "Secret" $ns $secretName }}
 {{- if and $existing $existing.data }}
   {{- if and (index $existing.data "tls.crt") (index $existing.data "tls.key") (index $existing.data "ca.crt") }}
@@ -29,6 +32,7 @@ data:
   tls.key: {{ $key | b64enc }}
   ca.crt: {{ $caCrt | b64enc }}
 ---
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -52,11 +56,17 @@ metadata:
   name: {{ include "karkive.fullname" . }}
   labels:
     {{- include "karkive.labels" . | nindent 4 }}
+  {{- if $useCM }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ printf "%s/%s" $ns (include "karkive.webhookCertificateName" .) | quote }}
+  {{- end }}
 webhooks:
   - name: vbackup.karkive.io
     admissionReviewVersions: ["v1"]
     clientConfig:
+      {{- if not $useCM }}
       caBundle: {{ $caCrt | b64enc }}
+      {{- end }}
       service:
         name: {{ $svc }}
         namespace: {{ $ns }}
@@ -79,7 +89,9 @@ webhooks:
   - name: vrestore.karkive.io
     admissionReviewVersions: ["v1"]
     clientConfig:
+      {{- if not $useCM }}
       caBundle: {{ $caCrt | b64enc }}
+      {{- end }}
       service:
         name: {{ $svc }}
         namespace: {{ $ns }}

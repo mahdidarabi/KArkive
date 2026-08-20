@@ -48,3 +48,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "karkive.webhookSecretName" -}}
 {{- printf "%s-tls" (include "karkive.webhookServiceName" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
+
+{{- define "karkive.webhookCertificateName" -}}
+{{- printf "%s-webhook" (include "karkive.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "karkive.webhookIssuerName" -}}
+{{- printf "%s-webhook-selfsigned" (include "karkive.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
