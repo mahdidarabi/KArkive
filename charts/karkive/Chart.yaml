@@ -2,7 +2,7 @@ apiVersion: v2
 name: karkive
 description: Kubernetes operator for logical backups and restores (Postgres first)
 type: application
-version: 0.0.1-alpha.5
-appVersion: "0.0.1-alpha.5"
+version: 0.0.1-alpha.6
+appVersion: "0.0.1-alpha.6"
 annotations:
   org.opencontainers.image.source: https://github.com/mahdidarabi/Karkive
