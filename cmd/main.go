@@ -19,6 +19,7 @@ import (
 	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
 	"github.com/mahdidarabi/Karkive/internal/config"
 	"github.com/mahdidarabi/Karkive/internal/controller"
+	kmetrics "github.com/mahdidarabi/Karkive/internal/metrics"
 )
 
 var (
@@ -118,6 +119,8 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Restore")
 		os.Exit(1)
 	}
+
+	kmetrics.Register(mgr.GetClient())
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

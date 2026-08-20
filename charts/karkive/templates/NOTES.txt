@@ -6,3 +6,11 @@ Install a Backup or Restore CR (postgres only in this phase):
   kubectl apply -f config/samples/karkive_v1alpha1_restore.yaml
 
 The operator creates a ConfigMap, optional PVC, and CronJob named `karkive-<cr-name>`.
+
+Metrics are served on port {{ .Values.metrics.port }} via Service {{ include "karkive.fullname" . }}-metrics.
+Enable scrape, alerts, and the Grafana dashboard with:
+
+  --set metrics.serviceMonitor.enabled=true
+  --set metrics.prometheusRule.enabled=true
+  --set metrics.grafanaDashboard.enabled=true
+

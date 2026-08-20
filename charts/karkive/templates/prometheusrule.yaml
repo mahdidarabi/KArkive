@@ -1,0 +1,67 @@
+{{- if and .Values.metrics.enabled .Values.metrics.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "karkive.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "karkive.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics
+  {{- with .Values.metrics.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  groups:
+    - name: karkive.operator
+      rules:
+        - alert: KarkiveBackupNotReady
+          expr: karkive_backup_ready == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Backup {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} is not Ready
+            description: The Backup CR has not been Ready for 15m (engine={{`{{ $labels.engine }}`}}).
+        - alert: KarkiveRestoreNotReady
+          expr: karkive_restore_ready == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Restore {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} is not Ready
+            description: The Restore CR has not been Ready for 15m (engine={{`{{ $labels.engine }}`}}).
+        - alert: KarkiveBackupJobFailed
+          expr: karkive_backup_last_job_failed == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Last backup Job failed for {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}}
+        - alert: KarkiveRestoreJobFailed
+          expr: karkive_restore_last_job_failed == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Last restore Job failed for {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}}
+        - alert: KarkiveBackupStale
+          expr: |-
+            karkive_backup_suspended == 0
+            and (time() - karkive_backup_last_successful_timestamp_seconds) > {{ .Values.metrics.prometheusRule.backupStaleSeconds }}
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Backup {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} has not succeeded recently
+            description: No successful backup within {{ .Values.metrics.prometheusRule.backupStaleSeconds }}s.
+        - alert: KarkiveCronJobMissedSchedule
+          expr: |-
+            kube_cronjob_spec_suspend == 0
+            and time() - kube_cronjob_next_schedule_time{cronjob=~"karkive-.*"} > {{ .Values.metrics.prometheusRule.missedScheduleGraceSeconds }}
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: CronJob {{`{{ $labels.namespace }}`}}/{{`{{ $labels.cronjob }}`}} missed its next schedule
+            description: Requires kube-state-metrics. The next_schedule_time is more than {{ .Values.metrics.prometheusRule.missedScheduleGraceSeconds }}s in the past.
+{{- end }}

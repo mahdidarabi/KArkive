@@ -37,11 +37,11 @@
 - [x] Operator `/healthz` and `/readyz`
 - [x] Helm liveness and readiness probes
 - [x] controller-runtime metrics bind address (`:8080`)
-- [ ] Metrics Service for the operator
-- [ ] Prometheus `ServiceMonitor`
-- [ ] Custom metrics per Backup/Restore (last success, duration, failures)
-- [ ] Alerts for missed schedules and failed Jobs
-- [ ] Grafana dashboard
+- [x] Metrics Service for the operator
+- [x] Prometheus `ServiceMonitor`
+- [x] Custom metrics per Backup/Restore (last success, duration, failures)
+- [x] Alerts for missed schedules and failed Jobs
+- [x] Grafana dashboard
 
 ## Later engines
 
