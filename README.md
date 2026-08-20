@@ -62,6 +62,16 @@ helm install karkive ./charts/karkive -n karkive-system --create-namespace \
 Images are published to `ghcr.io/mahdidarabi/karkive` from GitHub Actions on
 `main` (`latest`, `main`, `sha-<git-sha>`) and on tags `v*` (semver).
 
+Helm charts are pushed to GHCR on tags `v*` (`Chart.yaml` `version` and
+`appVersion` must match the tag without the `v` prefix):
+
+```bash
+helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.1-alpha.2
+helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
+  --version 0.0.1-alpha.2 \
+  -n karkive-system --create-namespace
+```
+
 The chart exposes `/metrics` on a ClusterIP Service. Prometheus Operator
 scrape, alerting rules, and a Grafana dashboard ConfigMap are off by default:
 

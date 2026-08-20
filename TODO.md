@@ -55,5 +55,5 @@
 - [ ] Validating webhooks for Backup/Restore
 - [x] CI (tests + image build)
 - [x] Publish the operator image to GHCR
-- [ ] Publish the Helm chart
+- [x] Publish the Helm chart
 - [ ] Richer status from the last Job (success/failure, failure reason)

@@ -1,6 +1,7 @@
 bin/
 dist/
 temp/
+_tmp/
 *.out
 cover.out
 coverage.html
