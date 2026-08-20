@@ -16,6 +16,7 @@ internal/
   controller/          Reconcile loops
   resources/           ConfigMap / PVC / CronJob builders
   pipeline/scripts/    Embedded shell stages for the dump pipeline
+  metrics/             Prometheus collector for Backup / Restore status
   config/              Operator-wide image / S3 defaults
 charts/karkive/        Helm chart that deploys the operator
 config/crd/bases/      Generated CRDs
@@ -60,6 +61,17 @@ helm install karkive ./charts/karkive -n karkive-system --create-namespace \
 
 Images are published to `ghcr.io/mahdidarabi/karkive` from GitHub Actions on
 `main` (`latest`, `main`, `sha-<git-sha>`) and on tags `v*` (semver).
+
+The chart exposes `/metrics` on a ClusterIP Service. Prometheus Operator
+scrape, alerting rules, and a Grafana dashboard ConfigMap are off by default:
+
+```bash
+helm install karkive ./charts/karkive -n karkive-system --create-namespace \
+  --set image.tag=latest \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.prometheusRule.enabled=true \
+  --set metrics.grafanaDashboard.enabled=true
+```
 
 ## Roadmap
 

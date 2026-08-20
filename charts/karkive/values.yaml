@@ -43,6 +43,26 @@ resources:
 metrics:
   enabled: true
   port: 8080
+  service:
+    type: ClusterIP
+    annotations: {}
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+  prometheusRule:
+    enabled: false
+    labels: {}
+    # No successful backup within this many seconds (non-suspended CRs).
+    backupStaleSeconds: 129600
+    # kube-state-metrics: next_schedule_time this far in the past.
+    missedScheduleGraceSeconds: 1800
+  grafanaDashboard:
+    enabled: false
+    labels:
+      grafana_dashboard: "1"
+    annotations: {}
 
 probes:
   port: 8081
