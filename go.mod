@@ -1,4 +1,4 @@
-module github.com/mahdidarabi/Karkive
+module github.com/mahdidarabi/KArkive
 
 go 1.26.2
 

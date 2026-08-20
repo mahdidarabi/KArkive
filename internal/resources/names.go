@@ -1,7 +1,7 @@
 package resources
 
 import (
-	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
+	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
 )
 
 // ResourceNamePrefix is prepended to every Kubernetes object the operator creates.

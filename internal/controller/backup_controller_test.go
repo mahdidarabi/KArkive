@@ -15,9 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
-	"github.com/mahdidarabi/Karkive/internal/config"
-	"github.com/mahdidarabi/Karkive/internal/resources"
+	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
+	"github.com/mahdidarabi/KArkive/internal/config"
+	"github.com/mahdidarabi/KArkive/internal/resources"
 )
 
 func testScheme(t *testing.T) *runtime.Scheme {

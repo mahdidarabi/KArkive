@@ -1,4 +1,4 @@
-Karkive operator {{ .Chart.AppVersion }} installed in {{ .Release.Namespace }}.
+KArkive operator {{ .Chart.AppVersion }} installed in {{ .Release.Namespace }}.
 
 Install a Backup or Restore CR (`engine`: postgres, mariadb, or redis):
 

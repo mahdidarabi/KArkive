@@ -13,9 +13,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
-	"github.com/mahdidarabi/Karkive/internal/ptr"
-	"github.com/mahdidarabi/Karkive/internal/resources"
+	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
+	"github.com/mahdidarabi/KArkive/internal/ptr"
+	"github.com/mahdidarabi/KArkive/internal/resources"
 )
 
 func TestCollector_BackupAndLastJob(t *testing.T) {

@@ -9,9 +9,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
-	"github.com/mahdidarabi/Karkive/internal/jobstatus"
-	"github.com/mahdidarabi/Karkive/internal/resources"
+	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
+	"github.com/mahdidarabi/KArkive/internal/jobstatus"
+	"github.com/mahdidarabi/KArkive/internal/resources"
 )
 
 func mapJobToOwner(kind, nameLabel string) handler.MapFunc {

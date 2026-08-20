@@ -17,9 +17,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
-	"github.com/mahdidarabi/Karkive/internal/config"
-	"github.com/mahdidarabi/Karkive/internal/resources"
+	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
+	"github.com/mahdidarabi/KArkive/internal/config"
+	"github.com/mahdidarabi/KArkive/internal/resources"
 )
 
 var requiredRestoreSecretKeys = []string{

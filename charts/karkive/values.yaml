@@ -80,7 +80,7 @@ metrics:
     labels:
       grafana_dashboard: "1"
     # Folder path for the Grafana sidecar. Written under folderKey as an
-    # annotation (nested paths like Platform/Karkive are kept) and as a
+    # annotation (nested paths like Platform/KArkive are kept) and as a
     # label (`/` becomes `-`, Kubernetes label values cannot contain `/`).
     # Set folderKey to match Grafana sidecar.dashboards.folderAnnotation.
     folder: ""

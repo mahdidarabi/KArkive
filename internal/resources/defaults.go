@@ -4,9 +4,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
-	"github.com/mahdidarabi/Karkive/internal/config"
-	"github.com/mahdidarabi/Karkive/internal/ptr"
+	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
+	"github.com/mahdidarabi/KArkive/internal/config"
+	"github.com/mahdidarabi/KArkive/internal/ptr"
 )
 
 func DefaultCleanupResources() corev1.ResourceRequirements {

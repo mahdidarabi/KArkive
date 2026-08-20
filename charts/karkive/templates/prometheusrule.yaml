@@ -14,7 +14,7 @@ spec:
   groups:
     - name: karkive.operator
       rules:
-        - alert: KarkiveBackupNotReady
+        - alert: KArkiveBackupNotReady
           expr: karkive_backup_ready == 0
           for: 15m
           labels:
@@ -22,7 +22,7 @@ spec:
           annotations:
             summary: Backup {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} is not Ready
             description: The Backup CR has not been Ready for 15m (engine={{`{{ $labels.engine }}`}}).
-        - alert: KarkiveRestoreNotReady
+        - alert: KArkiveRestoreNotReady
           expr: karkive_restore_ready == 0
           for: 15m
           labels:
@@ -30,7 +30,7 @@ spec:
           annotations:
             summary: Restore {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} is not Ready
             description: The Restore CR has not been Ready for 15m (engine={{`{{ $labels.engine }}`}}).
-        - alert: KarkiveBackupJobFailed
+        - alert: KArkiveBackupJobFailed
           expr: karkive_backup_last_job_info{outcome="Failed"} == 1
           for: 15m
           labels:
@@ -38,7 +38,7 @@ spec:
           annotations:
             summary: Last backup Job failed for {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}}
             description: Job {{`{{ $labels.job_name }}`}} failed (reason={{`{{ $labels.reason }}`}}, engine={{`{{ $labels.engine }}`}}).
-        - alert: KarkiveRestoreJobFailed
+        - alert: KArkiveRestoreJobFailed
           expr: karkive_restore_last_job_info{outcome="Failed"} == 1
           for: 15m
           labels:
@@ -46,7 +46,7 @@ spec:
           annotations:
             summary: Last restore Job failed for {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}}
             description: Job {{`{{ $labels.job_name }}`}} failed (reason={{`{{ $labels.reason }}`}}, engine={{`{{ $labels.engine }}`}}).
-        - alert: KarkiveBackupStale
+        - alert: KArkiveBackupStale
           expr: |-
             karkive_backup_suspended == 0
             and (time() - karkive_backup_last_successful_timestamp_seconds) > {{ .Values.metrics.prometheusRule.backupStaleSeconds }}
@@ -56,7 +56,7 @@ spec:
           annotations:
             summary: Backup {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} has not succeeded recently
             description: No successful backup within {{ .Values.metrics.prometheusRule.backupStaleSeconds }}s.
-        - alert: KarkiveCronJobMissedSchedule
+        - alert: KArkiveCronJobMissedSchedule
           expr: |-
             kube_cronjob_spec_suspend == 0
             and time() - kube_cronjob_next_schedule_time{cronjob=~"karkive-.*"} > {{ .Values.metrics.prometheusRule.missedScheduleGraceSeconds }}

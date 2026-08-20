@@ -16,10 +16,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
-	"github.com/mahdidarabi/Karkive/internal/config"
-	"github.com/mahdidarabi/Karkive/internal/controller"
-	kmetrics "github.com/mahdidarabi/Karkive/internal/metrics"
+	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
+	"github.com/mahdidarabi/KArkive/internal/config"
+	"github.com/mahdidarabi/KArkive/internal/controller"
+	kmetrics "github.com/mahdidarabi/KArkive/internal/metrics"
 )
 
 var (

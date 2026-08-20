@@ -3,7 +3,7 @@ package resources
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
+	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
 )
 
 // MutateBackupPVC writes the PVC spec. Call only when creating; spec is mostly immutable.

@@ -3,7 +3,7 @@ domain: io
 layout:
   - go.kubebuilder.io/v4
 projectName: karkive
-repo: github.com/mahdidarabi/Karkive
+repo: github.com/mahdidarabi/KArkive
 resources:
   - api:
       crdVersion: v1
@@ -12,7 +12,7 @@ resources:
     domain: io
     group: karkive
     kind: Backup
-    path: github.com/mahdidarabi/Karkive/api/v1alpha1
+    path: github.com/mahdidarabi/KArkive/api/v1alpha1
     version: v1alpha1
     webhooks:
       validation: true
@@ -24,7 +24,7 @@ resources:
     domain: io
     group: karkive
     kind: Restore
-    path: github.com/mahdidarabi/Karkive/api/v1alpha1
+    path: github.com/mahdidarabi/KArkive/api/v1alpha1
     version: v1alpha1
     webhooks:
       validation: true

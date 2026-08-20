@@ -1,12 +1,12 @@
-# Karkive
+# KArkive
 
-[![CI](https://github.com/mahdidarabi/Karkive/actions/workflows/ci.yaml/badge.svg)](https://github.com/mahdidarabi/Karkive/actions/workflows/ci.yaml)
-[![Helm](https://img.shields.io/badge/Helm-0.0.1-0F1689?logo=helm)](https://github.com/mahdidarabi/Karkive/pkgs/container/charts%2Fkarkive)
-[![Image](https://img.shields.io/badge/GHCR-karkive-blue?logo=github)](https://github.com/mahdidarabi/Karkive/pkgs/container/karkive)
+[![CI](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml/badge.svg)](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml)
+[![Helm](https://img.shields.io/badge/Helm-0.0.1-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
+[![Image](https://img.shields.io/badge/GHCR-karkive-blue?logo=github)](https://github.com/mahdidarabi/KArkive/pkgs/container/karkive)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev/)
-[![Kubebuilder](https://img.shields.io/badge/API-karkive.io%2Fv1alpha1-326CE5?logo=kubernetes)](https://github.com/mahdidarabi/Karkive/tree/main/api/v1alpha1)
+[![Kubebuilder](https://img.shields.io/badge/API-karkive.io%2Fv1alpha1-326CE5?logo=kubernetes)](https://github.com/mahdidarabi/KArkive/tree/main/api/v1alpha1)
 
-Kubernetes operator for **scheduled logical backups and restores**. You declare a `Backup` or `Restore` CR; Karkive owns a ConfigMap, optional PVC, and CronJob that dump, gzip, GPG-encrypt, and sync to S3 (and the reverse).
+Kubernetes operator for **scheduled logical backups and restores**. You declare a `Backup` or `Restore` CR; KArkive owns a ConfigMap, optional PVC, and CronJob that dump, gzip, GPG-encrypt, and sync to S3 (and the reverse).
 
 **Engines:** PostgreSQL · MariaDB · Redis
 
@@ -45,7 +45,7 @@ A CR named `app-postgres` is reconciled into owned resources prefixed `karkive-<
 
 ```mermaid
 flowchart LR
-  CR["Backup / Restore CR"] --> OP[Karkive operator]
+  CR["Backup / Restore CR"] --> OP[KArkive operator]
   OP --> CM[ConfigMap]
   OP --> PVC[PVC or emptyDir]
   OP --> CJ[CronJob]
