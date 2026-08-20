@@ -52,6 +52,12 @@ var (
 		[]string{"namespace", "name", "engine"},
 		nil,
 	)
+	backupLastJobInfoDesc = prometheus.NewDesc(
+		"karkive_backup_last_job_info",
+		"Always 1. Labels describe the most recently finished Job (outcome, reason, job_name). Absent if none has finished.",
+		[]string{"namespace", "name", "engine", "outcome", "reason", "job_name"},
+		nil,
+	)
 
 	restoreReadyDesc = prometheus.NewDesc(
 		"karkive_restore_ready",
@@ -89,6 +95,12 @@ var (
 		[]string{"namespace", "name", "engine"},
 		nil,
 	)
+	restoreLastJobInfoDesc = prometheus.NewDesc(
+		"karkive_restore_last_job_info",
+		"Always 1. Labels describe the most recently finished Job (outcome, reason, job_name). Absent if none has finished.",
+		[]string{"namespace", "name", "engine", "outcome", "reason", "job_name"},
+		nil,
+	)
 )
 
 // Collector exports Backup and Restore status plus last Job outcome.
@@ -110,12 +122,14 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- backupLastSuccessDesc
 	ch <- backupLastJobFailedDesc
 	ch <- backupLastJobDurationDesc
+	ch <- backupLastJobInfoDesc
 	ch <- restoreReadyDesc
 	ch <- restoreSuspendedDesc
 	ch <- restoreLastScheduleDesc
 	ch <- restoreLastSuccessDesc
 	ch <- restoreLastJobFailedDesc
 	ch <- restoreLastJobDurationDesc
+	ch <- restoreLastJobInfoDesc
 }
 
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
@@ -153,8 +167,11 @@ func (c *Collector) collectBackup(ch chan<- prometheus.Metric, backup *karkivev1
 		ch <- gauge(backupLastSuccessDesc, t, labels)
 	}
 
-	job := jobstatus.LastFinished(jobs, backup.Namespace, resources.LabelBackupName, backup.Name, resources.KindBackup)
-	emitLastJob(ch, job, backupLastJobFailedDesc, backupLastJobDurationDesc, labels)
+	st := backup.Status.LastJob
+	if st == nil {
+		st = jobstatus.Summarize(jobstatus.LastFinished(jobs, backup.Namespace, resources.LabelBackupName, backup.Name, resources.KindBackup))
+	}
+	emitLastJob(ch, st, backupLastJobFailedDesc, backupLastJobDurationDesc, backupLastJobInfoDesc, labels)
 }
 
 func (c *Collector) collectRestore(ch chan<- prometheus.Metric, restore *karkivev1alpha1.Restore, jobs []batchv1.Job) {
@@ -170,27 +187,42 @@ func (c *Collector) collectRestore(ch chan<- prometheus.Metric, restore *karkive
 		ch <- gauge(restoreLastSuccessDesc, t, labels)
 	}
 
-	job := jobstatus.LastFinished(jobs, restore.Namespace, resources.LabelRestoreName, restore.Name, resources.KindRestore)
-	emitLastJob(ch, job, restoreLastJobFailedDesc, restoreLastJobDurationDesc, labels)
+	st := restore.Status.LastJob
+	if st == nil {
+		st = jobstatus.Summarize(jobstatus.LastFinished(jobs, restore.Namespace, resources.LabelRestoreName, restore.Name, resources.KindRestore))
+	}
+	emitLastJob(ch, st, restoreLastJobFailedDesc, restoreLastJobDurationDesc, restoreLastJobInfoDesc, labels)
 }
 
-func emitLastJob(ch chan<- prometheus.Metric, job *batchv1.Job, failedDesc, durationDesc *prometheus.Desc, labels []string) {
-	if job == nil {
+func emitLastJob(ch chan<- prometheus.Metric, st *karkivev1alpha1.LastJobStatus, failedDesc, durationDesc, infoDesc *prometheus.Desc, labels []string) {
+	if st == nil {
 		ch <- gauge(failedDesc, 0, labels)
 		ch <- gauge(durationDesc, 0, labels)
 		return
 	}
-	ch <- gauge(failedDesc, boolValue(job.Status.Failed > 0 || jobstatus.Failed(job)), labels)
+	ch <- gauge(failedDesc, boolValue(st.Outcome == karkivev1alpha1.LastJobOutcomeFailed), labels)
 	d := 0.0
-	if job.Status.StartTime != nil {
-		if end := jobstatus.FinishedAt(job); end != nil {
-			d = end.Sub(job.Status.StartTime.Time).Seconds()
-			if d < 0 {
-				d = 0
-			}
+	if st.StartTime != nil && st.CompletionTime != nil {
+		d = st.CompletionTime.Sub(st.StartTime.Time).Seconds()
+		if d < 0 {
+			d = 0
 		}
 	}
 	ch <- gauge(durationDesc, d, labels)
+	outcome := st.Outcome
+	if outcome == "" {
+		outcome = "Unknown"
+	}
+	reason := st.Reason
+	if reason == "" {
+		reason = "None"
+	}
+	jobName := st.Name
+	if jobName == "" {
+		jobName = "unknown"
+	}
+	infoLabels := append(append([]string{}, labels...), outcome, reason, jobName)
+	ch <- gauge(infoDesc, 1, infoLabels)
 }
 
 func unixTime(t *metav1.Time) float64 {

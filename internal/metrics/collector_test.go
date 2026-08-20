@@ -89,6 +89,39 @@ func TestCollector_BackupAndLastJob(t *testing.T) {
 	if got["karkive_backup_last_job_duration_seconds"] != 120 {
 		t.Errorf("duration=%v", got["karkive_backup_last_job_duration_seconds"])
 	}
+	if got["karkive_backup_last_job_info"] != 1 {
+		t.Errorf("info=%v", got["karkive_backup_last_job_info"])
+	}
+	var outcome, reason, jobName string
+	for _, fam := range fams {
+		if fam.GetName() != "karkive_backup_last_job_info" {
+			continue
+		}
+		for _, m := range fam.Metric {
+			if !match(m, "backup", "app-postgres") {
+				continue
+			}
+			for _, l := range m.Label {
+				switch l.GetName() {
+				case "outcome":
+					outcome = l.GetValue()
+				case "reason":
+					reason = l.GetValue()
+				case "job_name":
+					jobName = l.GetValue()
+				}
+			}
+		}
+	}
+	if outcome != karkivev1alpha1.LastJobOutcomeSucceeded {
+		t.Errorf("outcome=%q", outcome)
+	}
+	if jobName != "karkive-app-postgres-1" {
+		t.Errorf("job_name=%q", jobName)
+	}
+	if reason == "" {
+		t.Error("expected reason label")
+	}
 }
 
 func TestCollector_AlwaysEmitsDuration(t *testing.T) {
@@ -192,6 +225,67 @@ func TestCollector_FailedJobWithoutCompletionTime(t *testing.T) {
 	}
 	if got["karkive_restore_last_job_duration_seconds"] != 30 {
 		t.Errorf("duration=%v", got["karkive_restore_last_job_duration_seconds"])
+	}
+	if got["karkive_restore_last_job_info"] != 1 {
+		t.Errorf("info=%v", got["karkive_restore_last_job_info"])
+	}
+}
+
+func TestCollector_UsesStatusLastJobWhenJobGone(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := karkivev1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := batchv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	start := metav1.NewTime(time.Unix(1_700_000_000, 0))
+	end := metav1.NewTime(start.Add(time.Minute))
+	backup := &karkivev1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "app-postgres", Namespace: "backup"},
+		Spec:       karkivev1alpha1.BackupSpec{Engine: karkivev1alpha1.EnginePostgres},
+		Status: karkivev1alpha1.BackupStatus{
+			LastJob: &karkivev1alpha1.LastJobStatus{
+				Name:           "karkive-app-postgres-9",
+				Outcome:        karkivev1alpha1.LastJobOutcomeFailed,
+				Reason:         "BackoffLimitExceeded",
+				StartTime:      &start,
+				CompletionTime: &end,
+			},
+		},
+	}
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup).Build()
+	reg := prometheus.NewPedanticRegistry()
+	reg.MustRegister(&Collector{Client: c})
+	fams, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]float64{}
+	var reason string
+	for _, fam := range fams {
+		for _, m := range fam.Metric {
+			if !match(m, "backup", "app-postgres") {
+				continue
+			}
+			got[fam.GetName()] = m.GetGauge().GetValue()
+			if fam.GetName() == "karkive_backup_last_job_info" {
+				for _, l := range m.Label {
+					if l.GetName() == "reason" {
+						reason = l.GetValue()
+					}
+				}
+			}
+		}
+	}
+	if got["karkive_backup_last_job_failed"] != 1 {
+		t.Errorf("failed=%v", got["karkive_backup_last_job_failed"])
+	}
+	if got["karkive_backup_last_job_duration_seconds"] != 60 {
+		t.Errorf("duration=%v", got["karkive_backup_last_job_duration_seconds"])
+	}
+	if reason != "BackoffLimitExceeded" {
+		t.Errorf("reason=%q", reason)
 	}
 }
 
