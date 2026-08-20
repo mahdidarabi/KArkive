@@ -59,18 +59,12 @@ kubectl apply -f config/samples/backup-secret.yaml
 kubectl apply -f config/samples/karkive_v1alpha1_backup.yaml
 ```
 
-Deploy the operator:
-
-```bash
-helm install karkive ./charts/karkive -n karkive-system --create-namespace \
-  --set image.tag=latest
-```
+## Deploy
 
 Images are published to `ghcr.io/mahdidarabi/karkive` from GitHub Actions on
-`main` (`latest`, `main`, `sha-<git-sha>`) and on tags `v*` (semver).
-
-Helm charts are pushed to GHCR on tags `v*` (`Chart.yaml` `version` and
-`appVersion` must match the tag without the `v` prefix):
+`main` (`latest`, `main`, `sha-<git-sha>`) and on tags `v*` (semver). Helm
+charts are pushed to GHCR on tags `v*` (`Chart.yaml` `version` and
+`appVersion` must match the tag without the `v` prefix).
 
 ```bash
 helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.1-alpha.8
@@ -83,8 +77,9 @@ The chart exposes `/metrics` on a ClusterIP Service. Prometheus Operator
 scrape, alerting rules, and a Grafana dashboard ConfigMap are off by default:
 
 ```bash
-helm install karkive ./charts/karkive -n karkive-system --create-namespace \
-  --set image.tag=latest \
+helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
+  --version 0.0.1-alpha.8 \
+  -n karkive-system --create-namespace \
   --set metrics.serviceMonitor.enabled=true \
   --set metrics.prometheusRule.enabled=true \
   --set metrics.grafanaDashboard.enabled=true
