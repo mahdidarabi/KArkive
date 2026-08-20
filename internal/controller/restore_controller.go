@@ -14,6 +14,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
@@ -61,7 +62,7 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseUnsupported, metav1.ConditionFalse, "UnsupportedEngine", msg)
 	}
 
-	if err := validateRestoreSpec(restore); err != nil {
+	if err := karkivev1alpha1.ValidateRestoreSpec(restore.Spec); err != nil {
 		r.Recorder.Event(restore, corev1.EventTypeWarning, "InvalidSpec", err.Error())
 		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "InvalidSpec", err.Error())
 	}
@@ -118,39 +119,6 @@ func (r *RestoreReconciler) fail(ctx context.Context, restore *karkivev1alpha1.R
 		return statusErr
 	}
 	return err
-}
-
-func validateRestoreSpec(restore *karkivev1alpha1.Restore) error {
-	if restore.Spec.Schedule == "" {
-		return fmt.Errorf("spec.schedule is required")
-	}
-	if restore.Spec.Database.Host == "" {
-		return fmt.Errorf("spec.database.host is required")
-	}
-	if restore.Spec.Database.Name == "" {
-		return fmt.Errorf("spec.database.name is required")
-	}
-	if restore.Spec.S3.Path == "" {
-		return fmt.Errorf("spec.s3.path is required")
-	}
-	if restore.Spec.SecretRef.Name == "" {
-		return fmt.Errorf("spec.secretRef.name is required")
-	}
-	switch resources.EffectiveEngine(restore.Spec.Engine) {
-	case karkivev1alpha1.EngineMariaDB:
-		if restore.Spec.MariaDBSecret == nil || restore.Spec.MariaDBSecret.Name == "" {
-			return fmt.Errorf("spec.mariadbSecret.name is required")
-		}
-	case karkivev1alpha1.EngineRedis:
-		if restore.Spec.RedisSecret == nil || restore.Spec.RedisSecret.Name == "" {
-			return fmt.Errorf("spec.redisSecret.name is required")
-		}
-	default:
-		if restore.Spec.PostgresSecret == nil || restore.Spec.PostgresSecret.Name == "" {
-			return fmt.Errorf("spec.postgresSecret.name is required")
-		}
-	}
-	return nil
 }
 
 func (r *RestoreReconciler) ensureJobSecret(ctx context.Context, restore *karkivev1alpha1.Restore) error {
@@ -228,6 +196,7 @@ func (r *RestoreReconciler) setStatus(
 	ready metav1.ConditionStatus,
 	reason, message string,
 ) error {
+	restore.Status.LastJob = lastJobStatus(ctx, r.Client, restore.Namespace, resources.LabelRestoreName, restore.Name, resources.KindRestore)
 	restore.Status.Phase = phase
 	restore.Status.ObservedGeneration = restore.Generation
 	meta.SetStatusCondition(&restore.Status.Conditions, metav1.Condition{
@@ -246,5 +215,6 @@ func (r *RestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.CronJob{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(mapJobToOwner(resources.KindRestore, resources.LabelRestoreName))).
 		Complete(r)
 }

@@ -1,0 +1,102 @@
+{{- if .Values.webhook.enabled }}
+{{- $svc := include "karkive.webhookServiceName" . }}
+{{- $ns := .Release.Namespace }}
+{{- $secretName := include "karkive.webhookSecretName" . }}
+{{- $ca := genCA "karkive-webhook-ca" 3650 }}
+{{- $altNames := list $svc (printf "%s.%s.svc" $svc $ns) (printf "%s.%s.svc.cluster.local" $svc $ns) }}
+{{- $cert := genSignedCert $svc nil $altNames 3650 $ca }}
+{{- $crt := $cert.Cert }}
+{{- $key := $cert.Key }}
+{{- $caCrt := $ca.Cert }}
+{{- $existing := lookup "v1" "Secret" $ns $secretName }}
+{{- if and $existing $existing.data }}
+  {{- if and (index $existing.data "tls.crt") (index $existing.data "tls.key") (index $existing.data "ca.crt") }}
+    {{- $crt = index $existing.data "tls.crt" | b64dec }}
+    {{- $key = index $existing.data "tls.key" | b64dec }}
+    {{- $caCrt = index $existing.data "ca.crt" | b64dec }}
+  {{- end }}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+  namespace: {{ $ns | quote }}
+  labels:
+    {{- include "karkive.labels" . | nindent 4 }}
+type: kubernetes.io/tls
+data:
+  tls.crt: {{ $crt | b64enc }}
+  tls.key: {{ $key | b64enc }}
+  ca.crt: {{ $caCrt | b64enc }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svc }}
+  namespace: {{ $ns | quote }}
+  labels:
+    {{- include "karkive.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: https
+      port: 443
+      targetPort: webhook
+      protocol: TCP
+  selector:
+    {{- include "karkive.selectorLabels" . | nindent 4 }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "karkive.fullname" . }}
+  labels:
+    {{- include "karkive.labels" . | nindent 4 }}
+webhooks:
+  - name: vbackup.karkive.io
+    admissionReviewVersions: ["v1"]
+    clientConfig:
+      caBundle: {{ $caCrt | b64enc }}
+      service:
+        name: {{ $svc }}
+        namespace: {{ $ns }}
+        path: /validate-karkive-io-v1alpha1-backup
+        port: 443
+    failurePolicy: Fail
+    sideEffects: None
+    timeoutSeconds: 10
+    {{- if .Values.watchNamespace }}
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: {{ .Values.watchNamespace | quote }}
+    {{- end }}
+    rules:
+      - apiGroups: ["karkive.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["backups"]
+        scope: Namespaced
+  - name: vrestore.karkive.io
+    admissionReviewVersions: ["v1"]
+    clientConfig:
+      caBundle: {{ $caCrt | b64enc }}
+      service:
+        name: {{ $svc }}
+        namespace: {{ $ns }}
+        path: /validate-karkive-io-v1alpha1-restore
+        port: 443
+    failurePolicy: Fail
+    sideEffects: None
+    timeoutSeconds: 10
+    {{- if .Values.watchNamespace }}
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: {{ .Values.watchNamespace | quote }}
+    {{- end }}
+    rules:
+      - apiGroups: ["karkive.io"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["restores"]
+        scope: Namespaced
+{{- end }}

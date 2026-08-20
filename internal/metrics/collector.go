@@ -6,12 +6,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	crmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	karkivev1alpha1 "github.com/mahdidarabi/Karkive/api/v1alpha1"
+	"github.com/mahdidarabi/Karkive/internal/jobstatus"
 	"github.com/mahdidarabi/Karkive/internal/resources"
 )
 
@@ -153,7 +153,7 @@ func (c *Collector) collectBackup(ch chan<- prometheus.Metric, backup *karkivev1
 		ch <- gauge(backupLastSuccessDesc, t, labels)
 	}
 
-	job := lastCompletedJob(jobs, backup.Namespace, resources.LabelBackupName, backup.Name, resources.KindBackup)
+	job := jobstatus.LastFinished(jobs, backup.Namespace, resources.LabelBackupName, backup.Name, resources.KindBackup)
 	emitLastJob(ch, job, backupLastJobFailedDesc, backupLastJobDurationDesc, labels)
 }
 
@@ -170,7 +170,7 @@ func (c *Collector) collectRestore(ch chan<- prometheus.Metric, restore *karkive
 		ch <- gauge(restoreLastSuccessDesc, t, labels)
 	}
 
-	job := lastCompletedJob(jobs, restore.Namespace, resources.LabelRestoreName, restore.Name, resources.KindRestore)
+	job := jobstatus.LastFinished(jobs, restore.Namespace, resources.LabelRestoreName, restore.Name, resources.KindRestore)
 	emitLastJob(ch, job, restoreLastJobFailedDesc, restoreLastJobDurationDesc, labels)
 }
 
@@ -180,10 +180,10 @@ func emitLastJob(ch chan<- prometheus.Metric, job *batchv1.Job, failedDesc, dura
 		ch <- gauge(durationDesc, 0, labels)
 		return
 	}
-	ch <- gauge(failedDesc, boolValue(job.Status.Failed > 0 || jobFailed(job)), labels)
+	ch <- gauge(failedDesc, boolValue(job.Status.Failed > 0 || jobstatus.Failed(job)), labels)
 	d := 0.0
 	if job.Status.StartTime != nil {
-		if end := jobFinishedAt(job); end != nil {
+		if end := jobstatus.FinishedAt(job); end != nil {
 			d = end.Sub(job.Status.StartTime.Time).Seconds()
 			if d < 0 {
 				d = 0
@@ -191,57 +191,6 @@ func emitLastJob(ch chan<- prometheus.Metric, job *batchv1.Job, failedDesc, dura
 		}
 	}
 	ch <- gauge(durationDesc, d, labels)
-}
-
-func lastCompletedJob(jobs []batchv1.Job, namespace, nameLabel, name, kind string) *batchv1.Job {
-	var best *batchv1.Job
-	var bestAt time.Time
-	for i := range jobs {
-		job := &jobs[i]
-		if job.Namespace != namespace {
-			continue
-		}
-		if job.Labels[resources.LabelKind] != kind || job.Labels[nameLabel] != name {
-			continue
-		}
-		end := jobFinishedAt(job)
-		if end == nil {
-			continue
-		}
-		if best == nil || end.After(bestAt) {
-			best = job
-			bestAt = end.Time
-		}
-	}
-	return best
-}
-
-func jobFinishedAt(job *batchv1.Job) *metav1.Time {
-	if job.Status.CompletionTime != nil && !job.Status.CompletionTime.IsZero() {
-		return job.Status.CompletionTime
-	}
-	for i := range job.Status.Conditions {
-		c := job.Status.Conditions[i]
-		if c.Status != corev1.ConditionTrue {
-			continue
-		}
-		if c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed {
-			if !c.LastTransitionTime.IsZero() {
-				return &c.LastTransitionTime
-			}
-		}
-	}
-	return nil
-}
-
-func jobFailed(job *batchv1.Job) bool {
-	for i := range job.Status.Conditions {
-		c := job.Status.Conditions[i]
-		if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-	return false
 }
 
 func unixTime(t *metav1.Time) float64 {

@@ -40,3 +40,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "karkive.webhookServiceName" -}}
+{{- printf "%s-webhook" (include "karkive.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "karkive.webhookSecretName" -}}
+{{- printf "%s-tls" (include "karkive.webhookServiceName" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}

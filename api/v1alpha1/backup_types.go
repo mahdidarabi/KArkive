@@ -104,6 +104,9 @@ type BackupStatus struct {
 	// LastSuccessfulTime copied from the CronJob.
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 
+	// LastJob is the most recently finished Job, including failure reason.
+	LastJob *LastJobStatus `json:"lastJob,omitempty"`
+
 	// Conditions of the Backup. Type Ready is always set after a reconcile.
 	// +listType=map
 	// +listMapKey=type
@@ -119,6 +122,7 @@ type BackupStatus struct {
 // +kubebuilder:printcolumn:name="Schedule",type=string,JSONPath=".spec.schedule"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Last Success",type=date,JSONPath=".status.lastSuccessfulTime"
+// +kubebuilder:printcolumn:name="Last Job",type=string,JSONPath=".status.lastJob.outcome"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
 // Backup describes a scheduled logical backup pipeline (dump → gzip → gpg → S3).

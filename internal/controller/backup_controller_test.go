@@ -182,3 +182,82 @@ func TestBackupReconcile_RedisCreatesOwnedResources(t *testing.T) {
 		t.Errorf("dump container=%q", cj.Spec.JobTemplate.Spec.Template.Spec.Containers[1].Name)
 	}
 }
+
+func TestBackupReconcile_CopiesLastJobFailure(t *testing.T) {
+	scheme := testScheme(t)
+	backup := &karkivev1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "app-postgres", Namespace: "backup"},
+		Spec: karkivev1alpha1.BackupSpec{
+			Engine:   karkivev1alpha1.EnginePostgres,
+			Schedule: "0 2 * * *",
+			Database: karkivev1alpha1.DatabaseSpec{Host: "postgres.example.svc.cluster.local", Name: "app"},
+			S3: karkivev1alpha1.S3Spec{
+				Endpoint: "https://s3.example.com",
+				Bucket:   "backups",
+				Path:     "app/pgdump",
+			},
+			SecretRef: corev1.LocalObjectReference{Name: "backup-creds"},
+		},
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup-creds", Namespace: "backup"},
+		Data: map[string][]byte{
+			"username":       []byte("app"),
+			"password":       []byte("secret"),
+			"s3_access_key":  []byte("ak"),
+			"s3_secret_key":  []byte("sk"),
+			"gpg_passphrase": []byte("pgp"),
+		},
+	}
+	failedAt := metav1.Now()
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "karkive-app-postgres-1",
+			Namespace: "backup",
+			Labels: map[string]string{
+				resources.LabelAppManagedBy: resources.ManagedBy,
+				resources.LabelKind:         resources.KindBackup,
+				resources.LabelBackupName:   "app-postgres",
+			},
+		},
+		Status: batchv1.JobStatus{
+			Failed: 1,
+			Conditions: []batchv1.JobCondition{{
+				Type:               batchv1.JobFailed,
+				Status:             corev1.ConditionTrue,
+				Reason:             "BackoffLimitExceeded",
+				Message:            "Job has reached the specified backoff limit",
+				LastTransitionTime: failedAt,
+			}},
+		},
+	}
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(backup, secret, job).
+		WithStatusSubresource(&karkivev1alpha1.Backup{}).
+		Build()
+	r := &BackupReconciler{
+		Client:   c,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(8),
+	}
+	_, err := r.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := &karkivev1alpha1.Backup{}
+	if err := c.Get(context.Background(), client.ObjectKeyFromObject(backup), updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status.LastJob == nil {
+		t.Fatal("expected lastJob")
+	}
+	if updated.Status.LastJob.Outcome != karkivev1alpha1.LastJobOutcomeFailed {
+		t.Errorf("outcome=%q", updated.Status.LastJob.Outcome)
+	}
+	if updated.Status.LastJob.Reason != "BackoffLimitExceeded" {
+		t.Errorf("reason=%q", updated.Status.LastJob.Reason)
+	}
+}

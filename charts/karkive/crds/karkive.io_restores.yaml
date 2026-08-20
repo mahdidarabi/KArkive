@@ -26,6 +26,9 @@ spec:
     - jsonPath: .status.phase
       name: Phase
       type: string
+    - jsonPath: .status.lastJob.outcome
+      name: Last Job
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -726,6 +729,33 @@ spec:
                 x-kubernetes-list-type: map
               cronJobName:
                 type: string
+              lastJob:
+                description: LastJob is the most recently finished Job, including
+                  failure reason.
+                properties:
+                  completionTime:
+                    description: CompletionTime when the Job finished (or the condition
+                      transition time).
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message from that condition.
+                    type: string
+                  name:
+                    description: Name of the Job.
+                    type: string
+                  outcome:
+                    description: Outcome is Succeeded or Failed.
+                    type: string
+                  reason:
+                    description: Reason from the JobComplete or JobFailed condition
+                      (e.g. BackoffLimitExceeded).
+                    type: string
+                  startTime:
+                    description: StartTime of the Job.
+                    format: date-time
+                    type: string
+                type: object
               lastScheduleTime:
                 format: date-time
                 type: string

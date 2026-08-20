@@ -38,7 +38,8 @@ generate: controller-gen
 manifests: controller-gen generate
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." \
 		output:crd:artifacts:config=config/crd/bases \
-		output:rbac:artifacts:config=config/rbac
+		output:rbac:artifacts:config=config/rbac \
+		output:webhook:artifacts:config=config/webhook
 	mkdir -p charts/karkive/crds
 	cp config/crd/bases/*.yaml charts/karkive/crds/
 

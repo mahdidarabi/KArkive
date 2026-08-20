@@ -6,6 +6,12 @@ Install a Backup or Restore CR (`engine`: postgres, mariadb, or redis):
   kubectl apply -f config/samples/karkive_v1alpha1_restore.yaml
 
 The operator creates a ConfigMap, optional PVC, and CronJob named `karkive-<cr-name>`.
+Backup and Restore status include the last finished Job outcome (`status.lastJob`).
+
+{{- if .Values.webhook.enabled }}
+Validating webhooks reject invalid Backup/Restore specs (cron, required fields).
+{{- end }}
+
 
 Metrics are served on port {{ .Values.metrics.port }} via Service {{ include "karkive.fullname" . }}-metrics.
 Enable scrape, alerts, and the Grafana dashboard with:

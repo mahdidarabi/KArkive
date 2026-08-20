@@ -57,8 +57,8 @@
 
 ## Later
 
-- [ ] Validating webhooks for Backup/Restore
+- [x] Validating webhooks for Backup/Restore
 - [x] CI (tests + image build)
 - [x] Publish the operator image to GHCR
 - [x] Publish the Helm chart
-- [ ] Richer status from the last Job (success/failure, failure reason)
+- [x] Richer status from the last Job (success/failure, failure reason)

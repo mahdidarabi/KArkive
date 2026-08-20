@@ -18,6 +18,11 @@ leaderElection: true
 # Empty = watch all namespaces.
 watchNamespace: ""
 
+# Validating admission webhooks for Backup / Restore specs.
+# Disabled for `make run`; the chart enables them and mounts serving certs.
+webhook:
+  enabled: true
+
 defaults:
   # cleanup + compress (find, gzip)
   busyboxImage: docker.io/library/busybox:1.37

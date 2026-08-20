@@ -38,6 +38,7 @@ func main() {
 	var enableLeaderElection bool
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var enableWebhooks bool
 	cfg := config.Config{}
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metrics endpoint binds to.")
@@ -45,6 +46,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager.")
 	flag.BoolVar(&secureMetrics, "metrics-secure", false, "Serve metrics via HTTPS.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false, "Enable HTTP/2 for metrics and webhook servers.")
+	flag.BoolVar(&enableWebhooks, "webhooks", false, "Register validating admission webhooks (requires serving certs).")
 	flag.StringVar(&cfg.BusyBoxImage, "busybox-image", config.DefaultBusyBoxImage, "Default image for cleanup and compress (find, gzip).")
 	flag.StringVar(&cfg.GnuPGImage, "gnupg-image", config.DefaultGnuPGImage, "Default image for encrypt (gpg).")
 	flag.StringVar(&cfg.PostgresImage, "postgres-image", config.DefaultPostgresImage, "Default image for pgdump (pg_dump / psql).")
@@ -75,14 +77,16 @@ func main() {
 	}
 
 	mgrOpts := ctrl.Options{
-		Scheme:  scheme,
-		Metrics: metricsOpts,
-		WebhookServer: webhook.NewServer(webhook.Options{
-			TLSOpts: tlsOpts,
-		}),
+		Scheme:                 scheme,
+		Metrics:                metricsOpts,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "karkive.io",
+	}
+	if enableWebhooks {
+		mgrOpts.WebhookServer = webhook.NewServer(webhook.Options{
+			TLSOpts: tlsOpts,
+		})
 	}
 
 	if ns := os.Getenv("WATCH_NAMESPACE"); ns != "" {
@@ -118,6 +122,17 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Restore")
 		os.Exit(1)
+	}
+
+	if enableWebhooks {
+		if err := (&karkivev1alpha1.Backup{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Backup")
+			os.Exit(1)
+		}
+		if err := (&karkivev1alpha1.Restore{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Restore")
+			os.Exit(1)
+		}
 	}
 
 	kmetrics.Register(mgr.GetClient())

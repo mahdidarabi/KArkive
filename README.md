@@ -49,6 +49,13 @@ Target credentials come from `spec.postgresSecret`, `spec.mariadbSecret`, or
 `spec.redisSecret` (`username` / `password` by default). Redis restore
 `FLUSHALL`s the target when `spec.dropDatabaseIfExists` is true (default).
 
+Status copies CronJob schedule/success times and the last finished Job
+(`status.lastJob`: name, `Succeeded`/`Failed`, reason, message).
+
+Invalid CRs are rejected at admission when the Helm chart's validating
+webhooks are enabled (cron schedule, required fields, engine secrets).
+`make run` does not start webhooks.
+
 ## Develop
 
 ```bash
