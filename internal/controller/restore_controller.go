@@ -39,6 +39,7 @@ type RestoreReconciler struct {
 // +kubebuilder:rbac:groups=karkive.io,resources=restores/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=karkive.io,resources=restores/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch

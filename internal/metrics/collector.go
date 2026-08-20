@@ -91,6 +91,8 @@ var (
 )
 
 // Collector exports Backup and Restore status plus last Job outcome.
+//
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 type Collector struct {
 	Client client.Client
 }
