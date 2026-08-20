@@ -54,6 +54,11 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if !restore.DeletionTimestamp.IsZero() {
+		logger.Info("Restore is deleting; not recreating owned resources")
+		return ctrl.Result{}, nil
+	}
+
 	if !resources.EngineImplemented(restore.Spec.Engine) {
 		engine := resources.EffectiveEngine(restore.Spec.Engine)
 		msg := fmt.Sprintf("engine %q is not implemented", engine)
@@ -157,7 +162,7 @@ func (r *RestoreReconciler) ensureConfigMap(ctx context.Context, restore *karkiv
 		if err := resources.MutateRestoreConfigMap(cm, restore, r.Config); err != nil {
 			return err
 		}
-		return controllerutil.SetControllerReference(restore, cm, r.Scheme)
+		return controllerutil.SetControllerReference(restore, cm, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 	})
 	return err
 }
@@ -171,10 +176,10 @@ func (r *RestoreReconciler) ensurePVC(ctx context.Context, restore *karkivev1alp
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, pvc, func() error {
 		if !pvc.CreationTimestamp.IsZero() {
 			pvc.Labels = resources.RestoreLabels(restore)
-			return controllerutil.SetControllerReference(restore, pvc, r.Scheme)
+			return controllerutil.SetControllerReference(restore, pvc, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 		}
 		resources.MutateRestorePVC(pvc, restore)
-		return controllerutil.SetControllerReference(restore, pvc, r.Scheme)
+		return controllerutil.SetControllerReference(restore, pvc, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 	})
 	return err
 }
@@ -184,7 +189,7 @@ func (r *RestoreReconciler) ensureCronJob(ctx context.Context, restore *karkivev
 	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: restore.Namespace}}
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cj, func() error {
 		resources.MutateRestoreCronJob(cj, restore, r.Config)
-		return controllerutil.SetControllerReference(restore, cj, r.Scheme)
+		return controllerutil.SetControllerReference(restore, cj, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 	})
 	return cj, err
 }

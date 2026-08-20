@@ -62,6 +62,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if !backup.DeletionTimestamp.IsZero() {
+		logger.Info("Backup is deleting; not recreating owned resources")
+		return ctrl.Result{}, nil
+	}
+
 	if !resources.EngineImplemented(backup.Spec.Engine) {
 		engine := resources.EffectiveEngine(backup.Spec.Engine)
 		msg := fmt.Sprintf("engine %q is not implemented", engine)
@@ -136,7 +141,7 @@ func (r *BackupReconciler) ensureConfigMap(ctx context.Context, backup *karkivev
 		if err := resources.MutateBackupConfigMap(cm, backup, r.Config); err != nil {
 			return err
 		}
-		return controllerutil.SetControllerReference(backup, cm, r.Scheme)
+		return controllerutil.SetControllerReference(backup, cm, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 	})
 	return err
 }
@@ -150,10 +155,10 @@ func (r *BackupReconciler) ensurePVC(ctx context.Context, backup *karkivev1alpha
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, pvc, func() error {
 		if !pvc.CreationTimestamp.IsZero() {
 			pvc.Labels = resources.BackupLabels(backup)
-			return controllerutil.SetControllerReference(backup, pvc, r.Scheme)
+			return controllerutil.SetControllerReference(backup, pvc, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 		}
 		resources.MutateBackupPVC(pvc, backup)
-		return controllerutil.SetControllerReference(backup, pvc, r.Scheme)
+		return controllerutil.SetControllerReference(backup, pvc, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 	})
 	return err
 }
@@ -163,7 +168,7 @@ func (r *BackupReconciler) ensureCronJob(ctx context.Context, backup *karkivev1a
 	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: backup.Namespace}}
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cj, func() error {
 		resources.MutateBackupCronJob(cj, backup, r.Config)
-		return controllerutil.SetControllerReference(backup, cj, r.Scheme)
+		return controllerutil.SetControllerReference(backup, cj, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
 	})
 	return cj, err
 }
