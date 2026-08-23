@@ -65,7 +65,7 @@
 
 ## Pipeline
 
-- [ ] DRY bash: extract shared `log` / `wait_for` / `hold_until_job_done` / `mark_failed` into one sourced helper (embed `common.sh` for backup and restore)
+- [x] DRY bash: extract shared `log` / `wait_for` / `hold_until_job_done` / `mark_failed` into one sourced helper (embed `common.sh` for backup and restore)
 - [ ] Make S3 sync optional (`spec.s3.enabled`, default true). When false: skip the `s3-sync` container, do not require S3 secret keys or endpoint/bucket. Encrypt still writes `retained/` on the PVC. Restore from local retained dumps needs a follow-up (`spec.source: s3 | pvc`)
 - [ ] Pick latest restore object by `mc find --json` `lastModified`, not `sort | tail`. Optionally add seconds + a unique suffix to dump filenames
 - [ ] Redis restore: document the 16-DB SCAN+MIGRATE limit; add a bulk path (load RDB on the target, or `replicaof` / RIOT) for large datasets

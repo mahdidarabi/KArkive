@@ -1,6 +1,7 @@
 package resources
 
 import (
+	"strings"
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -9,6 +10,7 @@ import (
 
 	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
 	"github.com/mahdidarabi/KArkive/internal/config"
+	"github.com/mahdidarabi/KArkive/internal/pipeline"
 	"github.com/mahdidarabi/KArkive/internal/ptr"
 )
 
@@ -95,6 +97,18 @@ func TestMutateBackupCronJob_PostgresStages(t *testing.T) {
 	}
 	if images["s3-sync"] != config.DefaultMcImage {
 		t.Errorf("s3-sync image=%s", images["s3-sync"])
+	}
+
+	cleanup := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+	if len(cleanup.Command) != 3 || cleanup.Command[0] != "/bin/sh" {
+		t.Fatalf("cleanup command=%v", cleanup.Command)
+	}
+	script := cleanup.Command[2]
+	if !strings.HasPrefix(script, pipeline.CommonScript()) {
+		t.Error("cleanup script missing prepended common.sh")
+	}
+	if !strings.Contains(script, "STAGE=cleanup") {
+		t.Error("cleanup script missing STAGE=cleanup")
 	}
 }
 
@@ -193,8 +207,19 @@ func TestMutateRestoreCronJob_PostgresStages(t *testing.T) {
 	if cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != corev1.RestartPolicyNever {
 		t.Errorf("restartPolicy=%q", cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy)
 	}
-	if *cj.Spec.JobTemplate.Spec.BackoffLimit != 1 {
+	if cj.Spec.JobTemplate.Spec.BackoffLimit != nil && *cj.Spec.JobTemplate.Spec.BackoffLimit != 1 {
 		t.Errorf("backoffLimit=%v", cj.Spec.JobTemplate.Spec.BackoffLimit)
+	}
+
+	cleanup := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+	if len(cleanup.Command) != 3 {
+		t.Fatalf("cleanup command=%v", cleanup.Command)
+	}
+	if !strings.HasPrefix(cleanup.Command[2], pipeline.CommonScript()) {
+		t.Error("restore cleanup script missing prepended common.sh")
+	}
+	if !strings.Contains(cleanup.Command[2], "STAGE=cleanup") {
+		t.Error("restore cleanup script missing STAGE=cleanup")
 	}
 
 	var workdir *corev1.Volume
