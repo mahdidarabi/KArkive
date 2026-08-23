@@ -55,10 +55,44 @@
 - [x] Restore: load RDB locally and `MIGRATE` keys (`FLUSHALL` when `dropDatabaseIfExists`)
 - [x] `spec.redisSecret` for target credentials
 
-## Later
+## Later (done)
 
 - [x] Validating webhooks for Backup/Restore
 - [x] CI (tests + image build)
 - [x] Publish the operator image to GHCR
 - [x] Publish the Helm chart
 - [x] Richer status from the last Job (success/failure, failure reason)
+
+## Pipeline
+
+- [ ] DRY bash: extract shared `log` / `wait_for` / `hold_until_job_done` / `mark_failed` into one sourced helper (embed `common.sh` for backup and restore)
+- [ ] Make S3 sync optional (`spec.s3.enabled`, default true). When false: skip the `s3-sync` container, do not require S3 secret keys or endpoint/bucket. Encrypt still writes `retained/` on the PVC. Restore from local retained dumps needs a follow-up (`spec.source: s3 | pvc`)
+- [ ] Pick latest restore object by `mc find --json` `lastModified`, not `sort | tail`. Optionally add seconds + a unique suffix to dump filenames
+- [ ] Redis restore: document the 16-DB SCAN+MIGRATE limit; add a bulk path (load RDB on the target, or `replicaof` / RIOT) for large datasets
+
+## API and controller
+
+- [ ] Keep `Ready` = resources admitted/synced. Add `BackupSucceeded` / `RestoreSucceeded` conditions from the last finished Job (do not overload `status.phase`)
+- [ ] Prefix owned names by kind: `karkive-backup-<name>` and `karkive-restore-<name>` (breaking: migrate or document rename). Alternative: webhook uniqueness across kinds — weaker, still share one CronJob name if both CRs are `app-postgres`
+- [ ] Event only on create or spec change. Patch status only when phase, conditions, or `lastJob` actually change
+- [ ] One owned-resource helper parameterized by kind. One `ImageSet` type instead of `BackupImages` + `RestoreImages`
+- [ ] Reject `spec.job.restartPolicy: Always` (Jobs cannot use it). Keep OnFailure (backup) and Never (restore)
+- [ ] Restore `spec.schedule` optional. Empty → create a suspended CronJob for `kubectl create job --from=…`
+- [ ] Default `dropDatabaseIfExists` to false (no implicit `FLUSHALL` / DROP DATABASE). Destructive restore must be explicit
+- [ ] Watch Secrets (`secretRef` + restore target secret) instead of 30s requeue on NotFound
+
+## Security and engines
+
+- [ ] FSGroup per engine, or one shared GID with matching `runAsGroup` (today always Postgres UID 26)
+- [ ] Postgres restore: do not interpolate `${PGDATABASE}` / `${role}` into SQL. Strict `[A-Za-z0-9_]+` or `psql` variables / `quote_ident`
+
+## Features
+
+- [ ] `spec.backupRef` on Restore: inherit engine, S3 path, and encryption settings from a Backup
+- [ ] BackupRun / manual trigger CR or subresource (no `kubectl create job --from=cronjob/…`)
+- [ ] Last object in status: S3 key, size, checksum of the last successful dump; Restore can default to it
+- [ ] Optional TLS for DB connections (`sslmode` / CA Secret for Postgres and MariaDB; Redis TLS)
+- [ ] Dump extras: `spec.database.extraArgs`, `excludeTables`, schema-only / data-only
+- [ ] Optional restore-verification Job after backup (ephemeral target; fail Backup on checksum / restore error)
+- [ ] Optional public-key GPG (encrypt to a public key Secret; private key only on Restore)
+- [ ] envtest for CronJob apply; shellcheck + bats for pipeline scripts
