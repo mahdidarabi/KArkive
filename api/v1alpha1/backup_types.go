@@ -47,11 +47,12 @@ type BackupSpec struct {
 	// Database connection (non-secret fields).
 	Database DatabaseSpec `json:"database"`
 
-	// S3 destination for encrypted dumps.
+	// S3 destination for encrypted dumps. Set enabled=false to keep dumps only
+	// in retained/ on the PVC (no s3-sync; S3 keys and endpoint/bucket not required).
 	S3 S3Spec `json:"s3"`
 
 	// SecretRef is a Secret in the same namespace with keys:
-	// username, password, s3_access_key, s3_secret_key, gpg_passphrase.
+	// username, password, gpg_passphrase, and (when s3.enabled) s3_access_key, s3_secret_key.
 	SecretRef corev1.LocalObjectReference `json:"secretRef"`
 
 	// Persistence for dump scratch + retained/. Default: PVC enabled, 1Gi.
@@ -125,7 +126,7 @@ type BackupStatus struct {
 // +kubebuilder:printcolumn:name="Last Job",type=string,JSONPath=".status.lastJob.outcome"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
-// Backup describes a scheduled logical backup pipeline (dump → gzip → gpg → S3).
+// Backup describes a scheduled logical backup pipeline (dump → gzip → gpg → optional S3).
 type Backup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -48,6 +48,7 @@ func TestMutateBackupConfigMap_Postgres(t *testing.T) {
 		"S3_PATH":     "app/pgdump",
 		"S3_ENDPOINT": "https://s3.example.com",
 		"S3_BUCKET":   "backups",
+		"S3_ENABLED":  "true",
 	}
 	for k, v := range want {
 		if cm.Data[k] != v {
@@ -109,6 +110,38 @@ func TestMutateBackupCronJob_PostgresStages(t *testing.T) {
 	}
 	if !strings.Contains(script, "STAGE=cleanup") {
 		t.Error("cleanup script missing STAGE=cleanup")
+	}
+}
+
+func TestMutateBackupCronJob_S3Disabled(t *testing.T) {
+	backup := testBackup()
+	backup.Spec.S3 = karkivev1alpha1.S3Spec{Enabled: ptr.To(false)}
+	cm := &corev1.ConfigMap{}
+	if err := MutateBackupConfigMap(cm, backup, config.Config{}); err != nil {
+		t.Fatal(err)
+	}
+	if cm.Data["S3_ENABLED"] != "false" {
+		t.Errorf("S3_ENABLED=%q", cm.Data["S3_ENABLED"])
+	}
+	if _, ok := cm.Data["S3_ENDPOINT"]; ok {
+		t.Error("S3_ENDPOINT should be omitted when S3 is disabled")
+	}
+
+	cj := &batchv1.CronJob{}
+	MutateBackupCronJob(cj, backup, config.Config{})
+	got := containerNames(cj)
+	want := []string{"cleanup", "pgdump", "compress", "encrypt"}
+	if len(got) != len(want) {
+		t.Fatalf("containers=%v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("containers=%v, want %v", got, want)
+		}
+	}
+	encrypt := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[3]
+	if len(encrypt.Command) < 3 || !strings.Contains(encrypt.Command[2], "S3_ENABLED") {
+		t.Error("encrypt script should honor S3_ENABLED")
 	}
 }
 

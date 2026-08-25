@@ -19,8 +19,12 @@ func ValidateBackupSpec(spec BackupSpec) error {
 	if spec.Database.Name == "" {
 		return fmt.Errorf("spec.database.name is required")
 	}
-	if spec.S3.Path == "" {
-		return fmt.Errorf("spec.s3.path is required")
+	if spec.S3.EnabledOrDefault() {
+		if spec.S3.Path == "" {
+			return fmt.Errorf("spec.s3.path is required")
+		}
+	} else if spec.Persistence != nil && spec.Persistence.Enabled != nil && !*spec.Persistence.Enabled {
+		return fmt.Errorf("spec.persistence.enabled must be true when spec.s3.enabled is false (dumps stay in retained/ on the PVC)")
 	}
 	if spec.SecretRef.Name == "" {
 		return fmt.Errorf("spec.secretRef.name is required")
@@ -41,6 +45,9 @@ func ValidateRestoreSpec(spec RestoreSpec) error {
 	}
 	if spec.Database.Name == "" {
 		return fmt.Errorf("spec.database.name is required")
+	}
+	if !spec.S3.EnabledOrDefault() {
+		return fmt.Errorf("spec.s3.enabled cannot be false; restore from local retained dumps is not implemented")
 	}
 	if spec.S3.Path == "" {
 		return fmt.Errorf("spec.s3.path is required")

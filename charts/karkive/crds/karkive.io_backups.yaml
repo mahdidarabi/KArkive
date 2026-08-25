@@ -39,7 +39,7 @@ spec:
     schema:
       openAPIV3Schema:
         description: Backup describes a scheduled logical backup pipeline (dump →
-          gzip → gpg → S3).
+          gzip → gpg → optional S3).
         properties:
           apiVersion:
             description: |-
@@ -547,22 +547,31 @@ spec:
                     type: object
                 type: object
               s3:
-                description: S3 destination for encrypted dumps.
+                description: |-
+                  S3 destination for encrypted dumps. Set enabled=false to keep dumps only
+                  in retained/ on the PVC (no s3-sync; S3 keys and endpoint/bucket not required).
                 properties:
                   bucket:
                     description: |-
                       Bucket is the S3 bucket name.
                       Falls back to the operator --default-s3-bucket flag when empty.
                     type: string
+                  enabled:
+                    description: |-
+                      Enabled uploads encrypted dumps to S3 (backup) or fetches them from S3
+                      (restore). Default true. When false on Backup, skip s3-sync; dumps stay
+                      in retained/ on the PVC. Restore from local retained dumps is not
+                      implemented — Restore still requires S3.
+                    type: boolean
                   endpoint:
                     description: |-
                       Endpoint is the S3 API URL, e.g. https://s3.example.com.
                       Falls back to the operator --default-s3-endpoint flag when empty.
                     type: string
                   path:
-                    description: Path is the key prefix inside the bucket (required),
-                      e.g. app/pgdump.
-                    minLength: 1
+                    description: |-
+                      Path is the key prefix inside the bucket, e.g. app/pgdump.
+                      Required when Enabled is true (the default).
                     type: string
                   retentionDays:
                     description: RetentionDays is how long encrypted dumps are kept
@@ -570,8 +579,6 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
-                required:
-                - path
                 type: object
               schedule:
                 description: Schedule is a standard Cron expression (required).
@@ -580,7 +587,7 @@ spec:
               secretRef:
                 description: |-
                   SecretRef is a Secret in the same namespace with keys:
-                  username, password, s3_access_key, s3_secret_key, gpg_passphrase.
+                  username, password, gpg_passphrase, and (when s3.enabled) s3_access_key, s3_secret_key.
                 properties:
                   name:
                     default: ""

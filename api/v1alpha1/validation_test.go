@@ -26,6 +26,21 @@ func TestValidateBackupSpec(t *testing.T) {
 	if err := ValidateBackupSpec(missing); err == nil {
 		t.Fatal("expected missing secretRef")
 	}
+
+	local := ok
+	local.S3 = S3Spec{Enabled: boolPtr(false)}
+	if err := ValidateBackupSpec(local); err != nil {
+		t.Fatal(err)
+	}
+	local.Persistence = &PersistenceSpec{Enabled: boolPtr(false)}
+	if err := ValidateBackupSpec(local); err == nil {
+		t.Fatal("expected persistence when S3 is disabled")
+	}
+	noPath := ok
+	noPath.S3.Path = ""
+	if err := ValidateBackupSpec(noPath); err == nil {
+		t.Fatal("expected s3.path when S3 is enabled")
+	}
 }
 
 func TestValidateRestoreSpec(t *testing.T) {
@@ -50,4 +65,11 @@ func TestValidateRestoreSpec(t *testing.T) {
 	if err := ValidateRestoreSpec(redis); err != nil {
 		t.Fatal(err)
 	}
+	disabled := ok
+	disabled.S3.Enabled = boolPtr(false)
+	if err := ValidateRestoreSpec(disabled); err == nil {
+		t.Fatal("expected reject when restore s3.enabled is false")
+	}
 }
+
+func boolPtr(v bool) *bool { return &v }

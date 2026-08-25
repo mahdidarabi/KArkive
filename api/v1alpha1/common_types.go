@@ -37,6 +37,12 @@ type DatabaseSpec struct {
 
 // S3Spec is the object-storage destination (or source, for restore).
 type S3Spec struct {
+	// Enabled uploads encrypted dumps to S3 (backup) or fetches them from S3
+	// (restore). Default true. When false on Backup, skip s3-sync; dumps stay
+	// in retained/ on the PVC. Restore from local retained dumps is not
+	// implemented — Restore still requires S3.
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// Endpoint is the S3 API URL, e.g. https://s3.example.com.
 	// Falls back to the operator --default-s3-endpoint flag when empty.
 	Endpoint string `json:"endpoint,omitempty"`
@@ -45,13 +51,21 @@ type S3Spec struct {
 	// Falls back to the operator --default-s3-bucket flag when empty.
 	Bucket string `json:"bucket,omitempty"`
 
-	// Path is the key prefix inside the bucket (required), e.g. app/pgdump.
-	// +kubebuilder:validation:MinLength=1
-	Path string `json:"path"`
+	// Path is the key prefix inside the bucket, e.g. app/pgdump.
+	// Required when Enabled is true (the default).
+	Path string `json:"path,omitempty"`
 
 	// RetentionDays is how long encrypted dumps are kept in S3 (backup only). Default 14.
 	// +kubebuilder:validation:Minimum=1
 	RetentionDays *int32 `json:"retentionDays,omitempty"`
+}
+
+// EnabledOrDefault is true unless Enabled is explicitly false.
+func (s S3Spec) EnabledOrDefault() bool {
+	if s.Enabled == nil {
+		return true
+	}
+	return *s.Enabled
 }
 
 // PersistenceSpec controls scratch storage for the pipeline.

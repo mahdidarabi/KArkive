@@ -22,10 +22,13 @@ func MutateBackupConfigMap(cm *corev1.ConfigMap, backup *karkivev1alpha1.Backup,
 		"DATA_DIR":             dataDir(backup),
 		"MC_CONFIG_DIR":        mcConfigDir(backup),
 		"LOCAL_RETENTION_DAYS": strconv.Itoa(int(localRetentionDays(backup))),
-		"S3_ENDPOINT":          s3Endpoint(backup, cfg),
-		"S3_BUCKET":            s3Bucket(backup, cfg),
-		"S3_PATH":              backup.Spec.S3.Path,
-		"S3_RETENTION_DAYS":    strconv.Itoa(int(s3RetentionDays(backup))),
+		"S3_ENABLED":           boolEnv(backup.Spec.S3.Enabled, true),
+	}
+	if backup.Spec.S3.EnabledOrDefault() {
+		cm.Data["S3_ENDPOINT"] = s3Endpoint(backup, cfg)
+		cm.Data["S3_BUCKET"] = s3Bucket(backup, cfg)
+		cm.Data["S3_PATH"] = backup.Spec.S3.Path
+		cm.Data["S3_RETENTION_DAYS"] = strconv.Itoa(int(s3RetentionDays(backup)))
 	}
 
 	switch engine {
@@ -43,11 +46,13 @@ func MutateBackupConfigMap(cm *corev1.ConfigMap, backup *karkivev1alpha1.Backup,
 		cm.Data["PGDATABASE"] = backup.Spec.Database.Name
 	}
 
-	if cm.Data["S3_ENDPOINT"] == "" {
-		return fmt.Errorf("s3.endpoint is empty (set spec.s3.endpoint or --default-s3-endpoint)")
-	}
-	if cm.Data["S3_BUCKET"] == "" {
-		return fmt.Errorf("s3.bucket is empty (set spec.s3.bucket or --default-s3-bucket)")
+	if backup.Spec.S3.EnabledOrDefault() {
+		if cm.Data["S3_ENDPOINT"] == "" {
+			return fmt.Errorf("s3.endpoint is empty (set spec.s3.endpoint or --default-s3-endpoint)")
+		}
+		if cm.Data["S3_BUCKET"] == "" {
+			return fmt.Errorf("s3.bucket is empty (set spec.s3.bucket or --default-s3-bucket)")
+		}
 	}
 	return nil
 }

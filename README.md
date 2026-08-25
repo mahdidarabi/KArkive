@@ -6,7 +6,7 @@
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev/)
 [![Kubebuilder](https://img.shields.io/badge/API-karkive.io%2Fv1alpha1-326CE5?logo=kubernetes)](https://github.com/mahdidarabi/KArkive/tree/main/api/v1alpha1)
 
-Kubernetes operator for **scheduled logical backups and restores**. You declare a `Backup` or `Restore` CR; KArkive owns a ConfigMap, optional PVC, and CronJob that dump, gzip, GPG-encrypt, and sync to S3 (and the reverse).
+Kubernetes operator for **scheduled logical backups and restores**. You declare a `Backup` or `Restore` CR; KArkive owns a ConfigMap, optional PVC, and CronJob that dump, gzip, GPG-encrypt, and optionally sync to S3 (and the reverse).
 
 **Engines:** PostgreSQL · MariaDB · Redis
 
@@ -56,7 +56,7 @@ flowchart LR
 
 ### Backup pipeline
 
-`cleanup` → dump → `compress` → `encrypt` → `s3-sync`
+`cleanup` → dump → `compress` → `encrypt` → `s3-sync` (omit `s3-sync` when `spec.s3.enabled` is false)
 
 ### Restore pipeline
 
@@ -124,6 +124,7 @@ spec:
     port: 5432              # defaults: 5432 / 3306 / 6379
     name: app
   s3:
+    enabled: true           # false → skip s3-sync; dumps stay in retained/ on the PVC
     endpoint: https://s3.example.com
     bucket: backups
     path: app/pgdump
@@ -143,6 +144,7 @@ Useful knobs:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
+| `spec.s3.enabled` | `true` | Upload to S3. `false` keeps dumps in `retained/` on the PVC (requires persistence; no S3 keys) |
 | `spec.suspend` | `false` | Stop the schedule; CronJob remains for manual Jobs |
 | `spec.job.concurrencyPolicy` | `Forbid` | CronJob concurrency |
 | `spec.job.backoffLimit` | `3` | Job retries |
@@ -213,8 +215,8 @@ The operator does not create or mutate Secrets. Apply them yourself in the CR na
 | --- | --- |
 | `username` | DB user (Redis ACL user; `default` if unused) |
 | `password` | DB password |
-| `s3_access_key` | S3 |
-| `s3_secret_key` | S3 |
+| `s3_access_key` | S3 (omit when `spec.s3.enabled` is false) |
+| `s3_secret_key` | S3 (omit when `spec.s3.enabled` is false) |
 | `gpg_passphrase` | Symmetric encryption of the dump |
 
 **Restore** splits credentials:
@@ -309,10 +311,10 @@ Operator-wide defaults (Helm `values.yaml` → flags):
 | `defaults.mariadbImage` | `--mariadb-image` | `mariadb:10.6` |
 | `defaults.redisImage` | `--redis-image` | `redis:7.4` |
 | `defaults.mcImage` | `--mc-image` | `minio/mc:RELEASE.2025-08-13T08-35-41Z` |
-| `defaults.s3.endpoint` | `--default-s3-endpoint` | empty (required on the CR unless set) |
+| `defaults.s3.endpoint` | `--default-s3-endpoint` | empty (required on the CR when S3 is enabled, unless set) |
 | `defaults.s3.bucket` | `--default-s3-bucket` | empty |
 
-Per-CR `spec.s3.endpoint` / `spec.s3.bucket` override the operator defaults. `spec.s3.path` is always required.
+Per-CR `spec.s3.endpoint` / `spec.s3.bucket` override the operator defaults. `spec.s3.path` is required when `spec.s3.enabled` is true (the default).
 
 ## Development
 

@@ -31,9 +31,12 @@ const (
 var requiredBackupSecretKeys = []string{
 	"username",
 	"password",
+	"gpg_passphrase",
+}
+
+var requiredBackupS3SecretKeys = []string{
 	"s3_access_key",
 	"s3_secret_key",
-	"gpg_passphrase",
 }
 
 // BackupReconciler reconciles a Backup object into ConfigMap + PVC + CronJob.
@@ -129,6 +132,13 @@ func (r *BackupReconciler) ensureSecret(ctx context.Context, backup *karkivev1al
 	for _, k := range requiredBackupSecretKeys {
 		if _, ok := secret.Data[k]; !ok {
 			return fmt.Errorf("secret %q is missing key %q", secret.Name, k)
+		}
+	}
+	if backup.Spec.S3.EnabledOrDefault() {
+		for _, k := range requiredBackupS3SecretKeys {
+			if _, ok := secret.Data[k]; !ok {
+				return fmt.Errorf("secret %q is missing key %q", secret.Name, k)
+			}
 		}
 	}
 	return nil

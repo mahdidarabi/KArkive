@@ -80,7 +80,8 @@
 - [x] DRY bash: extract shared `log` / `wait_for` / `hold_until_job_done` / `mark_failed` into one sourced helper (embed `common.sh` for backup and restore)
 - [x] MariaDB dump/restore: `--hex-blob` / utf8mb4 / `--databases`; restore strips GTID/DEFINER and recreates with utf8mb4
 - [x] Redis restore: ephemeral `redis-server` + `REPLICAOF` (not SCAN+MIGRATE)
-- [ ] Make S3 sync optional (`spec.s3.enabled`, default true). When false: skip the `s3-sync` container, do not require S3 secret keys or endpoint/bucket. Encrypt still writes `retained/` on the PVC. Restore from local retained dumps needs a follow-up (`spec.source: s3 | pvc`)
+- [x] Make S3 sync optional (`spec.s3.enabled`, default true). When false: skip the `s3-sync` container, do not require S3 secret keys or endpoint/bucket. Encrypt still writes `retained/` on the PVC.
+- [ ] Restore from local retained dumps (`spec.source: s3 | pvc`) when Backup skipped S3
 - [ ] Pick latest restore object by `mc find --json` `lastModified`, not `sort | tail`. Optionally add seconds + a unique suffix to dump filenames
 - [ ] Redis `REPLICAOF` restore needs the target to connect inbound to the Job pod `:6380` (NetworkPolicy / firewall). Document that; if replicaof is blocked, add a SCAN+MIGRATE fallback that pushes from the Job
 

@@ -123,6 +123,71 @@ func TestBackupReconcile_CreatesOwnedResources(t *testing.T) {
 	}
 }
 
+func TestBackupReconcile_S3DisabledSkipsSyncAndS3Keys(t *testing.T) {
+	scheme := testScheme(t)
+	enabled := false
+	backup := &karkivev1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "app-postgres", Namespace: "backup"},
+		Spec: karkivev1alpha1.BackupSpec{
+			Engine:    karkivev1alpha1.EnginePostgres,
+			Schedule:  "0 2 * * *",
+			Database:  karkivev1alpha1.DatabaseSpec{Host: "postgres.example.svc.cluster.local", Name: "app"},
+			S3:        karkivev1alpha1.S3Spec{Enabled: &enabled},
+			SecretRef: corev1.LocalObjectReference{Name: "backup-creds"},
+		},
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup-creds", Namespace: "backup"},
+		Data: map[string][]byte{
+			"username":       []byte("app"),
+			"password":       []byte("secret"),
+			"gpg_passphrase": []byte("pgp"),
+		},
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(backup, secret).
+		WithStatusSubresource(&karkivev1alpha1.Backup{}).
+		Build()
+	r := &BackupReconciler{
+		Client:   c,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(16),
+		Config:   config.Config{},
+	}
+	if _, err := r.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	owned := resources.BackupOwnedName(backup)
+	cj := &batchv1.CronJob{}
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: owned}, cj); err != nil {
+		t.Fatalf("cronjob: %v", err)
+	}
+	if n := len(cj.Spec.JobTemplate.Spec.Template.Spec.Containers); n != 4 {
+		t.Fatalf("expected 4 containers without s3-sync, got %d", n)
+	}
+
+	cm := &corev1.ConfigMap{}
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: owned}, cm); err != nil {
+		t.Fatalf("configmap: %v", err)
+	}
+	if cm.Data["S3_ENABLED"] != "false" {
+		t.Errorf("S3_ENABLED=%q", cm.Data["S3_ENABLED"])
+	}
+
+	updated := &karkivev1alpha1.Backup{}
+	if err := c.Get(context.Background(), client.ObjectKeyFromObject(backup), updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status.Phase != karkivev1alpha1.BackupPhaseReady {
+		t.Errorf("phase=%q", updated.Status.Phase)
+	}
+}
+
 func TestBackupReconcile_RedisCreatesOwnedResources(t *testing.T) {
 	scheme := testScheme(t)
 	backup := &karkivev1alpha1.Backup{

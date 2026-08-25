@@ -23,7 +23,7 @@ const (
 )
 
 // MutateBackupCronJob writes the backup pipeline CronJob.
-// Stage order: cleanup → dump → compress → encrypt → s3-sync.
+// Stage order: cleanup → dump → compress → encrypt → s3-sync (s3-sync omitted when s3.enabled=false).
 func MutateBackupCronJob(cj *batchv1.CronJob, backup *karkivev1alpha1.Backup, cfg config.Config) {
 	job := backup.Spec.Job
 	if job == nil {
@@ -32,7 +32,6 @@ func MutateBackupCronJob(cj *batchv1.CronJob, backup *karkivev1alpha1.Backup, cf
 
 	busyImg, busyPull := busyBoxImage(backup, cfg)
 	gpgImg, gpgPull := gnuPGImage(backup, cfg)
-	mcImg, mcPull := mcImage(backup, cfg)
 	cleanupRes, dumpRes, compressRes, encryptRes, s3Res := backupStageResources(backup)
 	secret := secretName(backup)
 	owned := BackupOwnedName(backup)
@@ -48,27 +47,32 @@ func MutateBackupCronJob(cj *batchv1.CronJob, backup *karkivev1alpha1.Backup, cf
 		restart = job.RestartPolicy
 	}
 
+	containers := []corev1.Container{
+		newScriptContainer(scriptOpts{
+			Name: "cleanup", Image: busyImg, Pull: busyPull,
+			Script:    pipeline.MustBackupScript("cleanup.sh"),
+			ConfigMap: cmName, Resources: cleanupRes,
+			Security: ToolsSecurityContext(), TmpSubPath: "cleanup-tmp",
+		}),
+		dumpContainer(backup, cfg, dumpRes, cmName, secret),
+		newScriptContainer(scriptOpts{
+			Name: "compress", Image: busyImg, Pull: busyPull,
+			Script:    pipeline.MustBackupScript("compress.sh"),
+			ConfigMap: cmName, Resources: compressRes,
+			Security: ToolsSecurityContext(), TmpSubPath: "compress-tmp-dir",
+		}),
+		encryptContainer(gpgImg, gpgPull, encryptRes, cmName),
+	}
+	if backup.Spec.S3.EnabledOrDefault() {
+		mcImg, mcPull := mcImage(backup, cfg)
+		containers = append(containers, s3SyncContainer(mcImg, mcPull, s3Res, cmName, secret))
+	}
+
 	podSpec := corev1.PodSpec{
 		RestartPolicy:   restart,
 		SecurityContext: PodSecurityContext(),
-		Containers: []corev1.Container{
-			newScriptContainer(scriptOpts{
-				Name: "cleanup", Image: busyImg, Pull: busyPull,
-				Script:    pipeline.MustBackupScript("cleanup.sh"),
-				ConfigMap: cmName, Resources: cleanupRes,
-				Security: ToolsSecurityContext(), TmpSubPath: "cleanup-tmp",
-			}),
-			dumpContainer(backup, cfg, dumpRes, cmName, secret),
-			newScriptContainer(scriptOpts{
-				Name: "compress", Image: busyImg, Pull: busyPull,
-				Script:    pipeline.MustBackupScript("compress.sh"),
-				ConfigMap: cmName, Resources: compressRes,
-				Security: ToolsSecurityContext(), TmpSubPath: "compress-tmp-dir",
-			}),
-			encryptContainer(gpgImg, gpgPull, encryptRes, cmName),
-			s3SyncContainer(mcImg, mcPull, s3Res, cmName, secret),
-		},
-		Volumes: backupVolumes(backup, secret),
+		Containers:      containers,
+		Volumes:         backupVolumes(backup, secret),
 	}
 
 	cj.Labels = labels

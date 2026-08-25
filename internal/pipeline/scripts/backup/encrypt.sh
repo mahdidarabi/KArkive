@@ -42,4 +42,16 @@ if [ "$found" -eq 0 ]; then
 fi
 touch "${DATA_DIR}/.step-encrypt-done"
 log "wrote marker .step-encrypt-done; stage work done"
-hold_until_job_done
+s3_enabled() {
+  case "${S3_ENABLED:-true}" in
+    0|no|NO|false|FALSE) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+if s3_enabled; then
+  hold_until_job_done
+else
+  log "S3 disabled; retained/ is the copy of record"
+  touch "${DATA_DIR}/.step-job-done"
+  log "wrote marker .step-job-done; releasing sibling containers; stage done"
+fi

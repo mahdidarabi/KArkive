@@ -604,15 +604,22 @@ spec:
                       Bucket is the S3 bucket name.
                       Falls back to the operator --default-s3-bucket flag when empty.
                     type: string
+                  enabled:
+                    description: |-
+                      Enabled uploads encrypted dumps to S3 (backup) or fetches them from S3
+                      (restore). Default true. When false on Backup, skip s3-sync; dumps stay
+                      in retained/ on the PVC. Restore from local retained dumps is not
+                      implemented — Restore still requires S3.
+                    type: boolean
                   endpoint:
                     description: |-
                       Endpoint is the S3 API URL, e.g. https://s3.example.com.
                       Falls back to the operator --default-s3-endpoint flag when empty.
                     type: string
                   path:
-                    description: Path is the key prefix inside the bucket (required),
-                      e.g. app/pgdump.
-                    minLength: 1
+                    description: |-
+                      Path is the key prefix inside the bucket, e.g. app/pgdump.
+                      Required when Enabled is true (the default).
                     type: string
                   retentionDays:
                     description: RetentionDays is how long encrypted dumps are kept
@@ -620,8 +627,6 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
-                required:
-                - path
                 type: object
               schedule:
                 description: Schedule is a standard Cron expression (required).

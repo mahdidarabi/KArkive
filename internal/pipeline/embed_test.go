@@ -91,3 +91,16 @@ func TestRedisRestoreUsesReplicaOf(t *testing.T) {
 		t.Fatal("redisrestore.sh should not FLUSHALL; REPLICAOF replaces the dataset")
 	}
 }
+
+func TestEncryptHonorsS3Enabled(t *testing.T) {
+	s, err := BackupScript("encrypt.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(s, "S3_ENABLED") {
+		t.Fatal("encrypt.sh should honor S3_ENABLED")
+	}
+	if !strings.Contains(s, ".step-job-done") {
+		t.Fatal("encrypt.sh should write .step-job-done when S3 is disabled")
+	}
+}
