@@ -66,11 +66,11 @@ flowchart LR
 | --- | --- | --- |
 | `postgres` | `pg_dump` | `pgrestore` |
 | `mariadb` | `mysqldump` | `mysqlrestore` |
-| `redis` | `redis-cli --rdb` | load RDB locally, `MIGRATE` keys |
+| `redis` | `redis-cli --rdb` | ephemeral `redis-server` + `REPLICAOF` |
 
 Shared stages use BusyBox (`find` / `gzip`), `vladgh/gpg`, and MinIO `mc`. Engine images default to CloudNativePG PostgreSQL 18.4, MariaDB 10.6, and Redis 7.4.
 
-Redis restore runs `FLUSHALL` on the target when `spec.dropDatabaseIfExists` is true (the default).
+Redis restore starts an ephemeral `redis-server` in the Job and has the target `REPLICAOF` that pod (`:6380`). The target must be able to connect to the Job pod. A non-empty target is replaced only when `spec.dropDatabaseIfExists` is true (the default).
 
 ## Install
 
@@ -198,7 +198,7 @@ spec:
 | --- | --- | --- |
 | `spec.backupFile` | empty | Specific S3 object name |
 | `spec.useLatestBackupAsFallback` | `true` | Newest dump matching the engine prefix when `backupFile` is empty or missing |
-| `spec.dropDatabaseIfExists` | `true` | Drop a non-empty target first (`FLUSHALL` on Redis) |
+| `spec.dropDatabaseIfExists` | `true` | Drop / replace a non-empty target first (`REPLICAOF` on Redis) |
 | `spec.stripPgAuditExtension` | `true` | Strip pgAudit DDL from Postgres dumps |
 | `spec.job.restartPolicy` | `Never` | Restore Jobs do not restart in-place |
 | `spec.job.backoffLimit` | `1` | Fail fast |

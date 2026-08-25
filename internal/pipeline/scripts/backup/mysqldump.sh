@@ -7,15 +7,42 @@ DATA_ROOT="${DATA_DIR:-${PGDUMP_DIR:?DATA_DIR or PGDUMP_DIR required}}"
 DATA_DIR="${DATA_ROOT}/${HOSTNAME}"
 pipeline_init
 wait_for "${DATA_DIR}/.step-cleanup-done" "cleanup"
-log "stage start: dump database=${MYSQL_DATABASE} host=${MYSQL_HOST}:${MYSQL_PORT}"
+DB="${MYSQL_DATABASE:-${PGDATABASE:-}}"
+HOST="${MYSQL_HOST:-${PGHOST:-}}"
+PORT="${MYSQL_PORT:-${PGPORT:-3306}}"
+USER="${MYSQL_USER:-${PGUSER:-}}"
+: "${DB:?MYSQL_DATABASE/PGDATABASE required}"
+: "${HOST:?MYSQL_HOST/PGHOST required}"
+: "${USER:?MYSQL_USER/PGUSER required}"
+export MYSQL_PWD="${MYSQL_PWD:-${MYSQL_PASSWORD:?MYSQL_PWD or MYSQL_PASSWORD required}}"
+log "stage start: dump database=${DB} host=${HOST}:${PORT}"
 log "scratch dir=${DATA_DIR}"
-OUT="${DATA_DIR}/mysqldump-${MYSQL_DATABASE}-$(date '+%Y-%m-%d-%H-%M').sql"
-export MYSQL_PWD="${MYSQL_PASSWORD}"
+OUT="${DATA_DIR}/mysqldump-${DB}-$(date '+%Y-%m-%d-%H-%M').sql"
 log "running mysqldump -> ${OUT}"
-mysqldump --single-transaction --routines --triggers --events \
-  --host="${MYSQL_HOST}" --port="${MYSQL_PORT}" --user="${MYSQL_USER}" \
-  --result-file="${OUT}" "${MYSQL_DATABASE}"
+mysqldump \
+  --host="${HOST}" \
+  --port="${PORT}" \
+  --user="${USER}" \
+  --single-transaction \
+  --routines \
+  --triggers \
+  --events \
+  --hex-blob \
+  --default-character-set=utf8mb4 \
+  --databases "${DB}" \
+  > "${OUT}"
 log "mysqldump finished size=$(wc -c < "${OUT}") bytes"
+log "database size summary"
+mariadb --host="${HOST}" --port="${PORT}" --user="${USER}" -N -e "
+  SELECT CONCAT(
+    table_schema, ' ',
+    ROUND(SUM(data_length + index_length) / 1024 / 1024, 2), ' MiB'
+  )
+  FROM information_schema.tables
+  WHERE table_schema = '${DB}'
+  GROUP BY table_schema;
+" || true
+log "WARNING: live DB stats above may differ from dump contents (DB can change during/after backup)"
 touch "${DATA_DIR}/.step-dump-done"
 log "wrote marker .step-dump-done; stage work done"
 hold_until_job_done

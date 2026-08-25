@@ -286,6 +286,9 @@ func TestMutateBackupCronJob_MariaDBStages(t *testing.T) {
 	if !hasEnv(dump, "MYSQL_USER") || !hasEnv(dump, "MYSQL_PASSWORD") {
 		t.Errorf("mysqldump missing MYSQL_USER/MYSQL_PASSWORD")
 	}
+	if len(dump.Command) < 3 || !strings.Contains(dump.Command[2], "--hex-blob") {
+		t.Errorf("mysqldump script missing --hex-blob / utf8mb4 flags")
+	}
 }
 
 func TestMutateBackupConfigMap_MariaDB(t *testing.T) {
@@ -353,6 +356,9 @@ func TestMutateRestoreCronJob_MariaDBStages(t *testing.T) {
 	if !hasEnv(restorec, "MYSQL_USER") || !hasEnv(restorec, "MYSQL_PASSWORD") {
 		t.Errorf("mysqlrestore missing MYSQL_USER/MYSQL_PASSWORD")
 	}
+	if len(restorec.Command) < 3 || !strings.Contains(restorec.Command[2], "GTID_PURGED") {
+		t.Errorf("mysqlrestore script missing GTID/DEFINER filter")
+	}
 }
 
 func testRedisRestore() *karkivev1alpha1.Restore {
@@ -374,6 +380,13 @@ func TestMutateRestoreCronJob_RedisStages(t *testing.T) {
 	want := []string{"cleanup", "fetch", "decrypt", "extract", "redisrestore"}
 	if len(got) != len(want) {
 		t.Fatalf("containers=%v, want %v", got, want)
+	}
+	restorec := cj.Spec.JobTemplate.Spec.Template.Spec.Containers[4]
+	if len(restorec.Command) < 3 || !strings.Contains(restorec.Command[2], "REPLICAOF") {
+		t.Errorf("redisrestore script missing REPLICAOF")
+	}
+	if strings.Contains(restorec.Command[2], "MIGRATE") {
+		t.Errorf("redisrestore script still uses SCAN+MIGRATE")
 	}
 }
 

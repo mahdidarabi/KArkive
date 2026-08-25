@@ -3,8 +3,8 @@
 log() { echo "[${STAGE:-pipeline} $(date '+%Y-%m-%dT%H:%M:%S%z')] $*" >&2; }
 
 mark_failed() {
-  # Group-writable so uid 1000 (mc) and engine UIDs (postgres 26, mysql/redis 999)
-  # can both signal.
+  # Group-writable so uid 1000 (mc), engine UIDs (postgres 26, mysql/redis 999),
+  # and tools UID 65532 (busybox / gpg) can all signal.
   touch "${STEP_DIR}/.step-failed" 2>/dev/null || true
   chmod 666 "${STEP_DIR}/.step-failed" 2>/dev/null || true
 }

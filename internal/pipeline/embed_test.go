@@ -54,3 +54,40 @@ func assertComposedOnce(t *testing.T, name, s string) {
 		}
 	}
 }
+
+func TestMariaDBDumpRestoreFlags(t *testing.T) {
+	dump, err := BackupScript("mysqldump.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"--hex-blob", "--default-character-set=utf8mb4", "--databases"} {
+		if !strings.Contains(dump, want) {
+			t.Errorf("mysqldump.sh missing %q", want)
+		}
+	}
+	restore, err := RestoreScript("mysqlrestore.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"GTID_PURGED", "DEFINER=CURRENT_USER", "utf8mb4_unicode_ci", "unique_checks=0"} {
+		if !strings.Contains(restore, want) {
+			t.Errorf("mysqlrestore.sh missing %q", want)
+		}
+	}
+}
+
+func TestRedisRestoreUsesReplicaOf(t *testing.T) {
+	s, err := RestoreScript("redisrestore.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(s, "REPLICAOF") {
+		t.Fatal("redisrestore.sh should use REPLICAOF")
+	}
+	if strings.Contains(s, "MIGRATE") {
+		t.Fatal("redisrestore.sh should not SCAN+MIGRATE keys")
+	}
+	if strings.Contains(s, "FLUSHALL") {
+		t.Fatal("redisrestore.sh should not FLUSHALL; REPLICAOF replaces the dataset")
+	}
+}

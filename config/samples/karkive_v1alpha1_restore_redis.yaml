@@ -1,6 +1,6 @@
 # Generic Redis restore sample. Apply after a Backup has written RDB dumps to S3
 # and a target Redis is reachable from this namespace.
-# Restore FLUSHALLs the target when spec.dropDatabaseIfExists is true (default).
+# Restore replaces a non-empty target via REPLICAOF when spec.dropDatabaseIfExists is true (default).
 apiVersion: karkive.io/v1alpha1
 kind: Restore
 metadata:
