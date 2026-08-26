@@ -13,6 +13,7 @@ spec:
     plural: backups
     shortNames:
     - kbackup
+    - bak
     singular: backup
   scope: Namespaced
   versions:

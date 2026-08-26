@@ -13,6 +13,7 @@ spec:
     plural: restores
     shortNames:
     - krestore
+    - res
     singular: restore
   scope: Namespaced
   versions:

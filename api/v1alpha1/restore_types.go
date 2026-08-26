@@ -116,7 +116,7 @@ type RestoreStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=krestore
+// +kubebuilder:resource:shortName=krestore;res
 // +kubebuilder:printcolumn:name="Engine",type=string,JSONPath=".spec.engine"
 // +kubebuilder:printcolumn:name="Schedule",type=string,JSONPath=".spec.schedule"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
