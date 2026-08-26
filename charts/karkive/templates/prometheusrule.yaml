@@ -59,7 +59,7 @@ spec:
         - alert: KArkiveCronJobMissedSchedule
           expr: |-
             kube_cronjob_spec_suspend == 0
-            and time() - kube_cronjob_next_schedule_time{cronjob=~"karkive-.*"} > {{ .Values.metrics.prometheusRule.missedScheduleGraceSeconds }}
+            and time() - kube_cronjob_next_schedule_time{cronjob=~"karkive-(backup|restore)-.*"} > {{ .Values.metrics.prometheusRule.missedScheduleGraceSeconds }}
           for: 15m
           labels:
             severity: warning

@@ -1,7 +1,7 @@
 # KArkive
 
 [![CI](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml/badge.svg)](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml)
-[![Helm](https://img.shields.io/badge/Helm-0.0.3-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
+[![Helm](https://img.shields.io/badge/Helm-0.0.4-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
 [![Image](https://img.shields.io/badge/GHCR-karkive-blue?logo=github)](https://github.com/mahdidarabi/KArkive/pkgs/container/karkive)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev/)
 [![Kubebuilder](https://img.shields.io/badge/API-karkive.io%2Fv1alpha1-326CE5?logo=kubernetes)](https://github.com/mahdidarabi/KArkive/tree/main/api/v1alpha1)
@@ -23,6 +23,7 @@ kubectl get backups,restores
 
 - [How it works](#how-it-works)
 - [Install](#install)
+  - [Upgrade from 0.0.3](#upgrade-from-003)
 - [Backup](#backup)
 - [Restore](#restore)
 - [Secrets](#secrets)
@@ -35,13 +36,13 @@ kubectl get backups,restores
 
 ## How it works
 
-A CR named `app-postgres` is reconciled into owned resources prefixed `karkive-<cr-name>`:
+A CR named `app-postgres` is reconciled into owned resources prefixed by kind:
 
-| Resource | Name | Notes |
-| --- | --- | --- |
-| ConfigMap | `karkive-app-postgres` | Embedded pipeline scripts |
-| PVC | `karkive-app-postgres` | Skip with `spec.persistence.enabled: false` (emptyDir) |
-| CronJob | `karkive-app-postgres` | One Job per schedule (or `kubectl create job --from=…`) |
+| Resource | Backup | Restore | Notes |
+| --- | --- | --- | --- |
+| ConfigMap | `karkive-backup-app-postgres` | `karkive-restore-app-postgres` | Embedded pipeline scripts |
+| PVC | `karkive-backup-app-postgres` | `karkive-restore-app-postgres` | Skip with `spec.persistence.enabled: false` (emptyDir) |
+| CronJob | `karkive-backup-app-postgres` | `karkive-restore-app-postgres` | One Job per schedule (or `kubectl create job --from=…`) |
 
 ```mermaid
 flowchart LR
@@ -76,13 +77,13 @@ Redis restore starts an ephemeral `redis-server` in the Job and has the target `
 
 Images are published to `ghcr.io/mahdidarabi/karkive` from GitHub Actions on `main` (`latest`, `main`, `sha-<git-sha>`) and on tags `v*` (semver). Helm charts are pushed to GHCR on tags `v*`. `Chart.yaml` `version` and `appVersion` must match the tag without the `v` prefix.
 
-Current release: **`0.0.3`**
+Current release: **`0.0.4`**
 
 ```bash
-helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.3
+helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.4
 
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.3 \
+  --version 0.0.4 \
   -n karkive-system --create-namespace
 ```
 
@@ -90,7 +91,7 @@ With Prometheus Operator scrape, alerts, and a Grafana dashboard ConfigMap:
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.3 \
+  --version 0.0.4 \
   -n karkive-system --create-namespace \
   --set metrics.serviceMonitor.enabled=true \
   --set metrics.prometheusRule.enabled=true \
@@ -101,12 +102,24 @@ On GitOps (Argo CD), prefer cert-manager for webhook serving certs so Helm does 
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.3 \
+  --version 0.0.4 \
   -n karkive-system --create-namespace \
   --set webhook.certManager.enabled=true
 ```
 
 cert-manager must already be installed. If you previously used the Helm-generated Secret, delete it once so cert-manager can create it.
+
+### Upgrade from 0.0.3
+
+**Breaking:** owned names are now `karkive-backup-<cr-name>` and `karkive-restore-<cr-name>` so a Backup and Restore can share a name (for example both `app-postgres`) without colliding on one CronJob.
+
+On reconcile the operator creates the new ConfigMap/CronJob/PVC and **deletes** the old `karkive-<cr-name>` ConfigMap and CronJob when this CR still owns them. Manual Jobs must use the new CronJob name:
+
+```bash
+kubectl create job --from=cronjob/karkive-backup-app-postgres app-postgres-manual -n backup
+```
+
+PVCs cannot be renamed. The old `karkive-<cr-name>` PVC is left in place (retained dumps stay there). Copy anything you still need onto the new PVC, then delete the leftover claim. S3 objects are unchanged.
 
 ## Backup
 
@@ -156,7 +169,7 @@ Useful knobs:
 Trigger a run without waiting for cron:
 
 ```bash
-kubectl create job --from=cronjob/karkive-app-postgres app-postgres-manual -n backup
+kubectl create job --from=cronjob/karkive-backup-app-postgres app-postgres-manual -n backup
 ```
 
 ## Restore
@@ -252,11 +265,11 @@ Status copies CronJob schedule/success times and the last finished Job:
 ```yaml
 status:
   phase: Ready
-  cronJobName: karkive-app-postgres
+  cronJobName: karkive-backup-app-postgres
   lastScheduleTime: "2026-08-20T02:00:00Z"
   lastSuccessfulTime: "2026-08-20T02:04:12Z"
   lastJob:
-    name: karkive-app-postgres-29781240
+    name: karkive-backup-app-postgres-29781240
     outcome: Succeeded   # or Failed
     reason: DeadlineExceeded
     message: "Job was active longer than specified deadline"
@@ -289,7 +302,7 @@ Alerts (when `metrics.prometheusRule.enabled=true`):
 - CR not Ready for 15m
 - Last Job failed
 - No successful backup within `backupStaleSeconds` (default 36h) on non-suspended Backups
-- Missed CronJob schedule via kube-state-metrics (`karkive-*`)
+- Missed CronJob schedule via kube-state-metrics (`karkive-backup-*` / `karkive-restore-*`)
 
 ## Webhooks
 

@@ -63,40 +63,34 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		engine := resources.EffectiveEngine(restore.Spec.Engine)
 		msg := fmt.Sprintf("engine %q is not implemented", engine)
 		logger.Info(msg)
-		r.Recorder.Event(restore, corev1.EventTypeWarning, "UnsupportedEngine", msg)
-		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseUnsupported, metav1.ConditionFalse, "UnsupportedEngine", msg)
+		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseUnsupported, metav1.ConditionFalse, "UnsupportedEngine", msg, corev1.EventTypeWarning, nil)
 	}
 
 	if err := karkivev1alpha1.ValidateRestoreSpec(restore.Spec); err != nil {
-		r.Recorder.Event(restore, corev1.EventTypeWarning, "InvalidSpec", err.Error())
-		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "InvalidSpec", err.Error())
+		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "InvalidSpec", err.Error(), corev1.EventTypeWarning, nil)
 	}
 
 	if err := r.ensureJobSecret(ctx, restore); err != nil {
 		if apierrors.IsNotFound(err) {
 			msg := fmt.Sprintf("secret %q not found", restore.Spec.SecretRef.Name)
-			r.Recorder.Event(restore, corev1.EventTypeWarning, "SecretNotFound", msg)
-			if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhasePending, metav1.ConditionFalse, "SecretNotFound", msg); statusErr != nil {
+			if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhasePending, metav1.ConditionFalse, "SecretNotFound", msg, corev1.EventTypeWarning, nil); statusErr != nil {
 				return ctrl.Result{}, statusErr
 			}
 			return ctrl.Result{RequeueAfter: secretRequeue}, nil
 		}
-		r.Recorder.Event(restore, corev1.EventTypeWarning, "SecretInvalid", err.Error())
-		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "SecretInvalid", err.Error())
+		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "SecretInvalid", err.Error(), corev1.EventTypeWarning, nil)
 	}
 
 	if err := r.ensureTargetSecret(ctx, restore); err != nil {
 		if apierrors.IsNotFound(err) {
 			name, _, _ := resources.RestoreTargetSecret(restore)
 			msg := fmt.Sprintf("target secret %q not found", name)
-			r.Recorder.Event(restore, corev1.EventTypeWarning, "TargetSecretNotFound", msg)
-			if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhasePending, metav1.ConditionFalse, "TargetSecretNotFound", msg); statusErr != nil {
+			if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhasePending, metav1.ConditionFalse, "TargetSecretNotFound", msg, corev1.EventTypeWarning, nil); statusErr != nil {
 				return ctrl.Result{}, statusErr
 			}
 			return ctrl.Result{RequeueAfter: secretRequeue}, nil
 		}
-		r.Recorder.Event(restore, corev1.EventTypeWarning, "TargetSecretInvalid", err.Error())
-		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "TargetSecretInvalid", err.Error())
+		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "TargetSecretInvalid", err.Error(), corev1.EventTypeWarning, nil)
 	}
 
 	if err := r.ensureConfigMap(ctx, restore); err != nil {
@@ -109,18 +103,16 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return ctrl.Result{}, r.fail(ctx, restore, "CronJobError", err)
 	}
+	if err := deleteLegacyOwned(ctx, r.Client, restore, resources.RestoreOwnedName(restore)); err != nil {
+		return ctrl.Result{}, r.fail(ctx, restore, "LegacyCleanupError", err)
+	}
 
-	restore.Status.CronJobName = cron.Name
-	restore.Status.LastScheduleTime = cron.Status.LastScheduleTime
-	restore.Status.LastSuccessfulTime = cron.Status.LastSuccessfulTime
 	msg := fmt.Sprintf("CronJob %s is synced", cron.Name)
-	r.Recorder.Event(restore, corev1.EventTypeNormal, "Synced", msg)
-	return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseReady, metav1.ConditionTrue, "Synced", msg)
+	return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseReady, metav1.ConditionTrue, "Synced", msg, corev1.EventTypeNormal, cron)
 }
 
 func (r *RestoreReconciler) fail(ctx context.Context, restore *karkivev1alpha1.Restore, reason string, err error) error {
-	r.Recorder.Event(restore, corev1.EventTypeWarning, reason, err.Error())
-	if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, reason, err.Error()); statusErr != nil {
+	if statusErr := r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, reason, err.Error(), corev1.EventTypeWarning, nil); statusErr != nil {
 		return statusErr
 	}
 	return err
@@ -199,18 +191,41 @@ func (r *RestoreReconciler) setStatus(
 	restore *karkivev1alpha1.Restore,
 	phase string,
 	ready metav1.ConditionStatus,
-	reason, message string,
+	reason, message, eventType string,
+	cron *batchv1.CronJob,
 ) error {
-	restore.Status.LastJob = lastJobStatus(ctx, r.Client, restore.Namespace, resources.LabelRestoreName, restore.Name, resources.KindRestore)
-	restore.Status.Phase = phase
-	restore.Status.ObservedGeneration = restore.Generation
-	meta.SetStatusCondition(&restore.Status.Conditions, metav1.Condition{
+	specChanged := generationChanged(restore.Generation, restore.Status.ObservedGeneration, restore.Status.Phase)
+	phaseChanged := restore.Status.Phase != phase
+	newLastJob := lastJobStatus(ctx, r.Client, restore.Namespace, resources.LabelRestoreName, restore.Name, resources.KindRestore)
+	lastJobChanged := !lastJobEqual(restore.Status.LastJob, newLastJob)
+
+	cronChanged := false
+	if cron != nil {
+		cronChanged = restore.Status.CronJobName != cron.Name ||
+			!metaTimeEqual(restore.Status.LastScheduleTime, cron.Status.LastScheduleTime) ||
+			!metaTimeEqual(restore.Status.LastSuccessfulTime, cron.Status.LastSuccessfulTime)
+		restore.Status.CronJobName = cron.Name
+		restore.Status.LastScheduleTime = cron.Status.LastScheduleTime
+		restore.Status.LastSuccessfulTime = cron.Status.LastSuccessfulTime
+	}
+
+	condChanged := meta.SetStatusCondition(&restore.Status.Conditions, metav1.Condition{
 		Type:               conditionReady,
 		Status:             ready,
 		Reason:             reason,
 		Message:            message,
 		ObservedGeneration: restore.Generation,
 	})
+	restore.Status.LastJob = newLastJob
+	restore.Status.Phase = phase
+	restore.Status.ObservedGeneration = restore.Generation
+
+	if r.Recorder != nil && shouldRecordEvent(eventType, specChanged, phaseChanged, condChanged) {
+		r.Recorder.Event(restore, eventType, reason, message)
+	}
+	if !statusNeedsPatch(specChanged, phaseChanged, condChanged, lastJobChanged, cronChanged) {
+		return nil
+	}
 	return r.Status().Update(ctx, restore)
 }
 

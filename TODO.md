@@ -90,8 +90,8 @@
 ## API and controller
 
 - [ ] Keep `Ready` = resources admitted/synced. Add `BackupSucceeded` / `RestoreSucceeded` conditions from the last finished Job (do not overload `status.phase`)
-- [ ] Prefix owned names by kind: `karkive-backup-<name>` and `karkive-restore-<name>` (breaking: migrate or document rename). Alternative: webhook uniqueness across kinds — weaker, still share one CronJob name if both CRs are `app-postgres`
-- [ ] Event only on create or spec change. Patch status only when phase, conditions, or `lastJob` actually change
+- [x] Prefix owned names by kind: `karkive-backup-<name>` and `karkive-restore-<name>` (breaking: migrate or document rename). Alternative: webhook uniqueness across kinds — weaker, still share one CronJob name if both CRs are `app-postgres`
+- [x] Event only on create or spec change. Patch status only when phase, conditions, or `lastJob` actually change
 - [ ] One owned-resource helper parameterized by kind. One `ImageSet` type instead of `BackupImages` + `RestoreImages`
 - [ ] Reject `spec.job.restartPolicy: Always` (Jobs cannot use it). Keep OnFailure (backup) and Never (restore)
 - [ ] Restore `spec.schedule` optional. Empty → create a suspended CronJob for `kubectl create job --from=…`

@@ -74,26 +74,22 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		engine := resources.EffectiveEngine(backup.Spec.Engine)
 		msg := fmt.Sprintf("engine %q is not implemented", engine)
 		logger.Info(msg)
-		r.Recorder.Event(backup, corev1.EventTypeWarning, "UnsupportedEngine", msg)
-		return ctrl.Result{}, r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseUnsupported, metav1.ConditionFalse, "UnsupportedEngine", msg)
+		return ctrl.Result{}, r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseUnsupported, metav1.ConditionFalse, "UnsupportedEngine", msg, corev1.EventTypeWarning, nil)
 	}
 
 	if err := karkivev1alpha1.ValidateBackupSpec(backup.Spec); err != nil {
-		r.Recorder.Event(backup, corev1.EventTypeWarning, "InvalidSpec", err.Error())
-		return ctrl.Result{}, r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseError, metav1.ConditionFalse, "InvalidSpec", err.Error())
+		return ctrl.Result{}, r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseError, metav1.ConditionFalse, "InvalidSpec", err.Error(), corev1.EventTypeWarning, nil)
 	}
 
 	if err := r.ensureSecret(ctx, backup); err != nil {
 		if apierrors.IsNotFound(err) {
 			msg := fmt.Sprintf("secret %q not found", backup.Spec.SecretRef.Name)
-			r.Recorder.Event(backup, corev1.EventTypeWarning, "SecretNotFound", msg)
-			if statusErr := r.setStatus(ctx, backup, karkivev1alpha1.BackupPhasePending, metav1.ConditionFalse, "SecretNotFound", msg); statusErr != nil {
+			if statusErr := r.setStatus(ctx, backup, karkivev1alpha1.BackupPhasePending, metav1.ConditionFalse, "SecretNotFound", msg, corev1.EventTypeWarning, nil); statusErr != nil {
 				return ctrl.Result{}, statusErr
 			}
 			return ctrl.Result{RequeueAfter: secretRequeue}, nil
 		}
-		r.Recorder.Event(backup, corev1.EventTypeWarning, "SecretInvalid", err.Error())
-		return ctrl.Result{}, r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseError, metav1.ConditionFalse, "SecretInvalid", err.Error())
+		return ctrl.Result{}, r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseError, metav1.ConditionFalse, "SecretInvalid", err.Error(), corev1.EventTypeWarning, nil)
 	}
 
 	if err := r.ensureConfigMap(ctx, backup); err != nil {
@@ -106,18 +102,16 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err != nil {
 		return ctrl.Result{}, r.fail(ctx, backup, "CronJobError", err)
 	}
+	if err := deleteLegacyOwned(ctx, r.Client, backup, resources.BackupOwnedName(backup)); err != nil {
+		return ctrl.Result{}, r.fail(ctx, backup, "LegacyCleanupError", err)
+	}
 
-	backup.Status.CronJobName = cron.Name
-	backup.Status.LastScheduleTime = cron.Status.LastScheduleTime
-	backup.Status.LastSuccessfulTime = cron.Status.LastSuccessfulTime
 	msg := fmt.Sprintf("CronJob %s is synced", cron.Name)
-	r.Recorder.Event(backup, corev1.EventTypeNormal, "Synced", msg)
-	return ctrl.Result{}, r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseReady, metav1.ConditionTrue, "Synced", msg)
+	return ctrl.Result{}, r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseReady, metav1.ConditionTrue, "Synced", msg, corev1.EventTypeNormal, cron)
 }
 
 func (r *BackupReconciler) fail(ctx context.Context, backup *karkivev1alpha1.Backup, reason string, err error) error {
-	r.Recorder.Event(backup, corev1.EventTypeWarning, reason, err.Error())
-	if statusErr := r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseError, metav1.ConditionFalse, reason, err.Error()); statusErr != nil {
+	if statusErr := r.setStatus(ctx, backup, karkivev1alpha1.BackupPhaseError, metav1.ConditionFalse, reason, err.Error(), corev1.EventTypeWarning, nil); statusErr != nil {
 		return statusErr
 	}
 	return err
@@ -188,18 +182,41 @@ func (r *BackupReconciler) setStatus(
 	backup *karkivev1alpha1.Backup,
 	phase string,
 	ready metav1.ConditionStatus,
-	reason, message string,
+	reason, message, eventType string,
+	cron *batchv1.CronJob,
 ) error {
-	backup.Status.LastJob = lastJobStatus(ctx, r.Client, backup.Namespace, resources.LabelBackupName, backup.Name, resources.KindBackup)
-	backup.Status.Phase = phase
-	backup.Status.ObservedGeneration = backup.Generation
-	meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+	specChanged := generationChanged(backup.Generation, backup.Status.ObservedGeneration, backup.Status.Phase)
+	phaseChanged := backup.Status.Phase != phase
+	newLastJob := lastJobStatus(ctx, r.Client, backup.Namespace, resources.LabelBackupName, backup.Name, resources.KindBackup)
+	lastJobChanged := !lastJobEqual(backup.Status.LastJob, newLastJob)
+
+	cronChanged := false
+	if cron != nil {
+		cronChanged = backup.Status.CronJobName != cron.Name ||
+			!metaTimeEqual(backup.Status.LastScheduleTime, cron.Status.LastScheduleTime) ||
+			!metaTimeEqual(backup.Status.LastSuccessfulTime, cron.Status.LastSuccessfulTime)
+		backup.Status.CronJobName = cron.Name
+		backup.Status.LastScheduleTime = cron.Status.LastScheduleTime
+		backup.Status.LastSuccessfulTime = cron.Status.LastSuccessfulTime
+	}
+
+	condChanged := meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
 		Type:               conditionReady,
 		Status:             ready,
 		Reason:             reason,
 		Message:            message,
 		ObservedGeneration: backup.Generation,
 	})
+	backup.Status.LastJob = newLastJob
+	backup.Status.Phase = phase
+	backup.Status.ObservedGeneration = backup.Generation
+
+	if r.Recorder != nil && shouldRecordEvent(eventType, specChanged, phaseChanged, condChanged) {
+		r.Recorder.Event(backup, eventType, reason, message)
+	}
+	if !statusNeedsPatch(specChanged, phaseChanged, condChanged, lastJobChanged, cronChanged) {
+		return nil
+	}
 	return r.Status().Update(ctx, backup)
 }
 

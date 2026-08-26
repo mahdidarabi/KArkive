@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -17,6 +18,7 @@ import (
 
 	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
 	"github.com/mahdidarabi/KArkive/internal/config"
+	"github.com/mahdidarabi/KArkive/internal/ptr"
 	"github.com/mahdidarabi/KArkive/internal/resources"
 )
 
@@ -90,7 +92,7 @@ func TestBackupReconcile_CreatesOwnedResources(t *testing.T) {
 	if cm.Data["PGDATABASE"] != "app" {
 		t.Errorf("PGDATABASE=%q", cm.Data["PGDATABASE"])
 	}
-	if cm.Name != "karkive-app-postgres" {
+	if cm.Name != "karkive-backup-app-postgres" {
 		t.Errorf("configmap name=%q", cm.Name)
 	}
 
@@ -277,7 +279,7 @@ func TestBackupReconcile_CopiesLastJobFailure(t *testing.T) {
 	failedAt := metav1.Now()
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "karkive-app-postgres-1",
+			Name:      "karkive-backup-app-postgres-1",
 			Namespace: "backup",
 			Labels: map[string]string{
 				resources.LabelAppManagedBy: resources.ManagedBy,
@@ -377,5 +379,245 @@ func TestBackupReconcile_DoesNotRecreateWhileDeleting(t *testing.T) {
 	owned := resources.BackupOwnedName(backup)
 	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: owned}, &batchv1.CronJob{}); err == nil {
 		t.Fatal("expected no CronJob while Backup is terminating")
+	}
+}
+
+func TestBackupReconcile_DeletesLegacyOwnedNames(t *testing.T) {
+	scheme := testScheme(t)
+	backup := testBackupCR()
+	backup.UID = types.UID("backup-uid")
+	secret := testBackupSecret()
+	legacy := resources.LegacyOwnedName(backup.Name)
+	owners := []metav1.OwnerReference{{
+		APIVersion: karkivev1alpha1.GroupVersion.String(),
+		Kind:       "Backup",
+		Name:       backup.Name,
+		UID:        backup.UID,
+		Controller: ptr.To(true),
+	}}
+	legacyCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: legacy, Namespace: backup.Namespace, OwnerReferences: owners}}
+	legacyCJ := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: legacy, Namespace: backup.Namespace, OwnerReferences: owners}}
+	legacyPVC := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: legacy, Namespace: backup.Namespace, OwnerReferences: owners}}
+
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(backup, secret, legacyCM, legacyCJ, legacyPVC).
+		WithStatusSubresource(&karkivev1alpha1.Backup{}).
+		Build()
+	r := &BackupReconciler{Client: c, Scheme: scheme, Recorder: record.NewFakeRecorder(8)}
+	if _, err := r.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	owned := resources.BackupOwnedName(backup)
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: owned}, &batchv1.CronJob{}); err != nil {
+		t.Fatalf("new CronJob: %v", err)
+	}
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: legacy}, &batchv1.CronJob{}); err == nil {
+		t.Fatal("expected legacy CronJob to be deleted")
+	}
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: legacy}, &corev1.ConfigMap{}); err == nil {
+		t.Fatal("expected legacy ConfigMap to be deleted")
+	}
+	if err := c.Get(context.Background(), client.ObjectKey{Namespace: backup.Namespace, Name: legacy}, &corev1.PersistentVolumeClaim{}); err != nil {
+		t.Fatalf("legacy PVC should be kept: %v", err)
+	}
+}
+
+func TestBackupReconcile_SkipsNoopStatusAndEvents(t *testing.T) {
+	scheme := testScheme(t)
+	backup := testBackupCR()
+	secret := testBackupSecret()
+	base := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(backup, secret).
+		WithStatusSubresource(&karkivev1alpha1.Backup{}).
+		Build()
+	c := &statusCountClient{Client: base}
+	rec := record.NewFakeRecorder(16)
+	r := &BackupReconciler{Client: c, Scheme: scheme, Recorder: rec}
+
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace}}
+	if _, err := r.Reconcile(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	if c.updates != 1 {
+		t.Fatalf("status updates after first reconcile=%d, want 1", c.updates)
+	}
+	events := drainEvents(rec)
+	if len(events) != 1 || !strings.Contains(events[0], "Synced") {
+		t.Fatalf("events after first reconcile=%v", events)
+	}
+
+	if _, err := r.Reconcile(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	if c.updates != 1 {
+		t.Fatalf("status updates after second reconcile=%d, want 1", c.updates)
+	}
+	if extra := drainEvents(rec); len(extra) != 0 {
+		t.Fatalf("unexpected events on second reconcile: %v", extra)
+	}
+}
+
+func TestBackupReconcile_PatchesLastJobWithoutSyncedEvent(t *testing.T) {
+	scheme := testScheme(t)
+	backup := testBackupCR()
+	secret := testBackupSecret()
+	base := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(backup, secret).
+		WithStatusSubresource(&karkivev1alpha1.Backup{}).
+		Build()
+	c := &statusCountClient{Client: base}
+	rec := record.NewFakeRecorder(16)
+	r := &BackupReconciler{Client: c, Scheme: scheme, Recorder: rec}
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace}}
+	if _, err := r.Reconcile(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	_ = drainEvents(rec)
+
+	failedAt := metav1.Now()
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "karkive-backup-app-postgres-1",
+			Namespace: backup.Namespace,
+			Labels: map[string]string{
+				resources.LabelAppManagedBy: resources.ManagedBy,
+				resources.LabelKind:         resources.KindBackup,
+				resources.LabelBackupName:   backup.Name,
+			},
+		},
+		Status: batchv1.JobStatus{
+			Failed: 1,
+			Conditions: []batchv1.JobCondition{{
+				Type:               batchv1.JobFailed,
+				Status:             corev1.ConditionTrue,
+				Reason:             "BackoffLimitExceeded",
+				Message:            "Job has reached the specified backoff limit",
+				LastTransitionTime: failedAt,
+			}},
+		},
+	}
+	if err := c.Create(context.Background(), job); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Reconcile(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	if c.updates != 2 {
+		t.Fatalf("status updates=%d, want 2 after lastJob change", c.updates)
+	}
+	if extra := drainEvents(rec); len(extra) != 0 {
+		t.Fatalf("lastJob change must not emit Synced: %v", extra)
+	}
+	updated := &karkivev1alpha1.Backup{}
+	if err := c.Get(context.Background(), client.ObjectKeyFromObject(backup), updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status.LastJob == nil || updated.Status.LastJob.Outcome != karkivev1alpha1.LastJobOutcomeFailed {
+		t.Fatalf("lastJob=%v", updated.Status.LastJob)
+	}
+}
+
+func TestBackupReconcile_SecretNotFoundEventsOnce(t *testing.T) {
+	scheme := testScheme(t)
+	backup := testBackupCR()
+	base := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(backup).
+		WithStatusSubresource(&karkivev1alpha1.Backup{}).
+		Build()
+	c := &statusCountClient{Client: base}
+	rec := record.NewFakeRecorder(16)
+	r := &BackupReconciler{Client: c, Scheme: scheme, Recorder: rec}
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace}}
+	if _, err := r.Reconcile(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	events := drainEvents(rec)
+	if len(events) != 1 || !strings.Contains(events[0], "SecretNotFound") {
+		t.Fatalf("events=%v", events)
+	}
+	if c.updates != 1 {
+		t.Fatalf("status updates=%d, want 1", c.updates)
+	}
+	if _, err := r.Reconcile(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	if extra := drainEvents(rec); len(extra) != 0 {
+		t.Fatalf("repeated SecretNotFound events: %v", extra)
+	}
+	if c.updates != 1 {
+		t.Fatalf("status updates after second reconcile=%d, want 1", c.updates)
+	}
+}
+
+func testBackupCR() *karkivev1alpha1.Backup {
+	return &karkivev1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "app-postgres", Namespace: "backup", Generation: 1},
+		Spec: karkivev1alpha1.BackupSpec{
+			Engine:   karkivev1alpha1.EnginePostgres,
+			Schedule: "0 2 * * *",
+			Database: karkivev1alpha1.DatabaseSpec{Host: "postgres.example.svc.cluster.local", Name: "app"},
+			S3: karkivev1alpha1.S3Spec{
+				Endpoint: "https://s3.example.com",
+				Bucket:   "backups",
+				Path:     "app/pgdump",
+			},
+			SecretRef: corev1.LocalObjectReference{Name: "backup-creds"},
+		},
+	}
+}
+
+func testBackupSecret() *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup-creds", Namespace: "backup"},
+		Data: map[string][]byte{
+			"username":       []byte("app"),
+			"password":       []byte("secret"),
+			"s3_access_key":  []byte("ak"),
+			"s3_secret_key":  []byte("sk"),
+			"gpg_passphrase": []byte("pgp"),
+		},
+	}
+}
+
+type statusCountClient struct {
+	client.Client
+	updates int
+}
+
+func (c *statusCountClient) Status() client.SubResourceWriter {
+	return &statusCountWriter{SubResourceWriter: c.Client.Status(), n: &c.updates}
+}
+
+type statusCountWriter struct {
+	client.SubResourceWriter
+	n *int
+}
+
+func (w *statusCountWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	*w.n++
+	return w.SubResourceWriter.Update(ctx, obj, opts...)
+}
+
+func (w *statusCountWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	*w.n++
+	return w.SubResourceWriter.Patch(ctx, obj, patch, opts...)
+}
+
+func drainEvents(rec *record.FakeRecorder) []string {
+	var out []string
+	for {
+		select {
+		case e := <-rec.Events:
+			out = append(out, e)
+		default:
+			return out
+		}
 	}
 }
