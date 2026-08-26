@@ -114,7 +114,8 @@ spec:
                 description: Images overrides operator-wide default images.
                 properties:
                   busybox:
-                    description: ImageSpec is a full image reference plus pull policy.
+                    description: BusyBox is used for cleanup, compress, and extract
+                      (find, gzip).
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -124,7 +125,7 @@ spec:
                         type: string
                     type: object
                   gnupg:
-                    description: ImageSpec is a full image reference plus pull policy.
+                    description: GnuPG is used for encrypt and decrypt.
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -134,7 +135,7 @@ spec:
                         type: string
                     type: object
                   mariadb:
-                    description: ImageSpec is a full image reference plus pull policy.
+                    description: MariaDB is used for mysqldump / mysql restore.
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -144,7 +145,8 @@ spec:
                         type: string
                     type: object
                   mc:
-                    description: ImageSpec is a full image reference plus pull policy.
+                    description: Mc is the minio client image used for s3-sync and
+                      fetch.
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -154,7 +156,7 @@ spec:
                         type: string
                     type: object
                   postgres:
-                    description: ImageSpec is a full image reference plus pull policy.
+                    description: Postgres is used for pg_dump / pg_restore / psql.
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -164,7 +166,7 @@ spec:
                         type: string
                     type: object
                   redis:
-                    description: ImageSpec is a full image reference plus pull policy.
+                    description: Redis is used for redis-cli dump and restore.
                     properties:
                       image:
                         description: Image is registry/repository:tag.

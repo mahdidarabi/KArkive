@@ -30,8 +30,8 @@ func MutateBackupCronJob(cj *batchv1.CronJob, backup *karkivev1alpha1.Backup, cf
 		job = &karkivev1alpha1.JobPolicy{}
 	}
 
-	busyImg, busyPull := busyBoxImage(backup, cfg)
-	gpgImg, gpgPull := gnuPGImage(backup, cfg)
+	busyImg, busyPull := busyBoxImage(backup.Spec.Images, cfg)
+	gpgImg, gpgPull := gnuPGImage(backup.Spec.Images, cfg)
 	cleanupRes, dumpRes, compressRes, encryptRes, s3Res := backupStageResources(backup)
 	secret := secretName(backup)
 	owned := BackupOwnedName(backup)
@@ -64,7 +64,7 @@ func MutateBackupCronJob(cj *batchv1.CronJob, backup *karkivev1alpha1.Backup, cf
 		encryptContainer(gpgImg, gpgPull, encryptRes, cmName),
 	}
 	if backup.Spec.S3.EnabledOrDefault() {
-		mcImg, mcPull := mcImage(backup, cfg)
+		mcImg, mcPull := mcImage(backup.Spec.Images, cfg)
 		containers = append(containers, s3SyncContainer(mcImg, mcPull, s3Res, cmName, secret))
 	}
 
@@ -109,7 +109,7 @@ func dumpContainer(
 	engine := EffectiveEngine(backup.Spec.Engine)
 	switch engine {
 	case karkivev1alpha1.EngineMariaDB:
-		img, pull := mariadbImage(backup, cfg)
+		img, pull := mariadbImage(backup.Spec.Images, cfg)
 		c := newScriptContainer(scriptOpts{
 			Name: "mysqldump", Image: img, Pull: pull,
 			Script:    pipeline.MustBackupScript("mysqldump.sh"),
@@ -122,7 +122,7 @@ func dumpContainer(
 		)
 		return c
 	case karkivev1alpha1.EngineRedis:
-		img, pull := redisImage(backup, cfg)
+		img, pull := redisImage(backup.Spec.Images, cfg)
 		c := newScriptContainer(scriptOpts{
 			Name: "redisdump", Image: img, Pull: pull,
 			Script:    pipeline.MustBackupScript("redisdump.sh"),
@@ -135,7 +135,7 @@ func dumpContainer(
 		)
 		return c
 	default:
-		img, pull := postgresImage(backup, cfg)
+		img, pull := postgresImage(backup.Spec.Images, cfg)
 		c := newScriptContainer(scriptOpts{
 			Name: "pgdump", Image: img, Pull: pull,
 			Script:    pipeline.MustBackupScript("pgdump.sh"),
@@ -234,7 +234,7 @@ func secretEnv(envName, secret, key string) corev1.EnvVar {
 
 func backupVolumes(backup *karkivev1alpha1.Backup, secret string) []corev1.Volume {
 	var datadir corev1.VolumeSource
-	if persistenceEnabled(backup.Spec.Persistence) {
+	if PersistenceEnabled(backup.Spec.Persistence) {
 		datadir = corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: BackupOwnedName(backup),

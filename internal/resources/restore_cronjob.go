@@ -19,9 +19,9 @@ func MutateRestoreCronJob(cj *batchv1.CronJob, restore *karkivev1alpha1.Restore,
 		job = &karkivev1alpha1.JobPolicy{}
 	}
 
-	busyImg, busyPull := restoreBusyBoxImage(restore, cfg)
-	gpgImg, gpgPull := restoreGnuPGImage(restore, cfg)
-	mcImg, mcPull := restoreMcImage(restore, cfg)
+	busyImg, busyPull := busyBoxImage(restore.Spec.Images, cfg)
+	gpgImg, gpgPull := gnuPGImage(restore.Spec.Images, cfg)
+	mcImg, mcPull := mcImage(restore.Spec.Images, cfg)
 	cleanupRes, fetchRes, decryptRes, extractRes, restoreRes := restoreStageResources(restore)
 	secret := restoreSecretName(restore)
 	owned := RestoreOwnedName(restore)
@@ -128,7 +128,7 @@ func restoreEngineContainer(
 	engine := EffectiveEngine(restore.Spec.Engine)
 	switch engine {
 	case karkivev1alpha1.EngineMariaDB:
-		img, pull := restoreMariaDBImage(restore, cfg)
+		img, pull := mariadbImage(restore.Spec.Images, cfg)
 		name, userKey, passKey := RestoreMariaDBSecret(restore)
 		c := newScriptContainer(scriptOpts{
 			Name: "mysqlrestore", Image: img, Pull: pull,
@@ -143,7 +143,7 @@ func restoreEngineContainer(
 		)
 		return c
 	case karkivev1alpha1.EngineRedis:
-		img, pull := restoreRedisImage(restore, cfg)
+		img, pull := redisImage(restore.Spec.Images, cfg)
 		name, userKey, passKey := RestoreRedisSecret(restore)
 		c := newScriptContainer(scriptOpts{
 			Name: "redisrestore", Image: img, Pull: pull,
@@ -158,7 +158,7 @@ func restoreEngineContainer(
 		)
 		return c
 	default:
-		img, pull := restorePostgresImage(restore, cfg)
+		img, pull := postgresImage(restore.Spec.Images, cfg)
 		name, userKey, passKey := RestorePostgresSecret(restore)
 		c := newScriptContainer(scriptOpts{
 			Name: "pgrestore", Image: img, Pull: pull,
@@ -177,7 +177,7 @@ func restoreEngineContainer(
 
 func restoreVolumes(restore *karkivev1alpha1.Restore, secret string) []corev1.Volume {
 	var workdir corev1.VolumeSource
-	if persistenceEnabled(restore.Spec.Persistence) {
+	if PersistenceEnabled(restore.Spec.Persistence) {
 		workdir = corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: RestoreOwnedName(restore),

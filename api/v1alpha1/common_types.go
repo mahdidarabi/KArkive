@@ -97,6 +97,22 @@ type ImageSpec struct {
 	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
 }
 
+// ImageSet overrides pipeline container images for Backup and Restore.
+type ImageSet struct {
+	// BusyBox is used for cleanup, compress, and extract (find, gzip).
+	BusyBox *ImageSpec `json:"busybox,omitempty"`
+	// GnuPG is used for encrypt and decrypt.
+	GnuPG *ImageSpec `json:"gnupg,omitempty"`
+	// Postgres is used for pg_dump / pg_restore / psql.
+	Postgres *ImageSpec `json:"postgres,omitempty"`
+	// Mc is the minio client image used for s3-sync and fetch.
+	Mc *ImageSpec `json:"mc,omitempty"`
+	// MariaDB is used for mysqldump / mysql restore.
+	MariaDB *ImageSpec `json:"mariadb,omitempty"`
+	// Redis is used for redis-cli dump and restore.
+	Redis *ImageSpec `json:"redis,omitempty"`
+}
+
 // SecretKeySelector points at a Secret and optional key names.
 type SecretKeySelector struct {
 	// Name of the Secret in the same namespace.

@@ -13,7 +13,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -93,15 +92,20 @@ func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, r.setStatus(ctx, restore, karkivev1alpha1.RestorePhaseError, metav1.ConditionFalse, "TargetSecretInvalid", err.Error(), corev1.EventTypeWarning, nil)
 	}
 
-	if err := r.ensureConfigMap(ctx, restore); err != nil {
-		return ctrl.Result{}, r.fail(ctx, restore, "ConfigMapError", err)
-	}
-	if err := r.ensurePVC(ctx, restore); err != nil {
-		return ctrl.Result{}, r.fail(ctx, restore, "PVCError", err)
-	}
-	cron, err := r.ensureCronJob(ctx, restore)
+	cron, err := ensureOwned(ctx, r.Client, r.Scheme, ownedResources{
+		Owner:       restore,
+		Name:        resources.RestoreOwnedName(restore),
+		Persistence: restore.Spec.Persistence,
+		Labels:      resources.RestoreLabels(restore),
+		MutateConfigMap: func(cm *corev1.ConfigMap) error {
+			return resources.MutateRestoreConfigMap(cm, restore, r.Config)
+		},
+		MutateCronJob: func(cj *batchv1.CronJob) {
+			resources.MutateRestoreCronJob(cj, restore, r.Config)
+		},
+	})
 	if err != nil {
-		return ctrl.Result{}, r.fail(ctx, restore, "CronJobError", err)
+		return ctrl.Result{}, r.fail(ctx, restore, ownedReason(err), err)
 	}
 	if err := deleteLegacyOwned(ctx, r.Client, restore, resources.RestoreOwnedName(restore)); err != nil {
 		return ctrl.Result{}, r.fail(ctx, restore, "LegacyCleanupError", err)
@@ -145,45 +149,6 @@ func (r *RestoreReconciler) ensureTargetSecret(ctx context.Context, restore *kar
 		}
 	}
 	return nil
-}
-
-func (r *RestoreReconciler) ensureConfigMap(ctx context.Context, restore *karkivev1alpha1.Restore) error {
-	owned := resources.RestoreOwnedName(restore)
-	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: restore.Namespace}}
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
-		if err := resources.MutateRestoreConfigMap(cm, restore, r.Config); err != nil {
-			return err
-		}
-		return controllerutil.SetControllerReference(restore, cm, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
-	})
-	return err
-}
-
-func (r *RestoreReconciler) ensurePVC(ctx context.Context, restore *karkivev1alpha1.Restore) error {
-	if restore.Spec.Persistence != nil && restore.Spec.Persistence.Enabled != nil && !*restore.Spec.Persistence.Enabled {
-		return nil
-	}
-	owned := resources.RestoreOwnedName(restore)
-	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: restore.Namespace}}
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, pvc, func() error {
-		if !pvc.CreationTimestamp.IsZero() {
-			pvc.Labels = resources.RestoreLabels(restore)
-			return controllerutil.SetControllerReference(restore, pvc, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
-		}
-		resources.MutateRestorePVC(pvc, restore)
-		return controllerutil.SetControllerReference(restore, pvc, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
-	})
-	return err
-}
-
-func (r *RestoreReconciler) ensureCronJob(ctx context.Context, restore *karkivev1alpha1.Restore) (*batchv1.CronJob, error) {
-	owned := resources.RestoreOwnedName(restore)
-	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: owned, Namespace: restore.Namespace}}
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cj, func() error {
-		resources.MutateRestoreCronJob(cj, restore, r.Config)
-		return controllerutil.SetControllerReference(restore, cj, r.Scheme, controllerutil.WithBlockOwnerDeletion(false))
-	})
-	return cj, err
 }
 
 func (r *RestoreReconciler) setStatus(

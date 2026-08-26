@@ -5,22 +5,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BackupImages overrides container images for backup pipeline stages.
-type BackupImages struct {
-	// BusyBox is used for cleanup and compress (find, gzip).
-	BusyBox *ImageSpec `json:"busybox,omitempty"`
-	// GnuPG is used for encrypt.
-	GnuPG *ImageSpec `json:"gnupg,omitempty"`
-	// Postgres is used for pgdump (pg_dump / psql).
-	Postgres *ImageSpec `json:"postgres,omitempty"`
-	// Mc is the minio client image used for s3-sync.
-	Mc *ImageSpec `json:"mc,omitempty"`
-	// MariaDB is used for mysqldump / mysql restore.
-	MariaDB *ImageSpec `json:"mariadb,omitempty"`
-	// Redis is used for redis-cli --rdb dump and restore.
-	Redis *ImageSpec `json:"redis,omitempty"`
-}
-
 // BackupResources overrides CPU/memory/ephemeral-storage per pipeline stage.
 type BackupResources struct {
 	Cleanup  *corev1.ResourceRequirements `json:"cleanup,omitempty"`
@@ -69,7 +53,7 @@ type BackupSpec struct {
 	McConfigDir string `json:"mcConfigDir,omitempty"`
 
 	// Images overrides operator-wide default images.
-	Images *BackupImages `json:"images,omitempty"`
+	Images *ImageSet `json:"images,omitempty"`
 
 	// Resources overrides per-stage resource requests/limits.
 	Resources *BackupResources `json:"resources,omitempty"`

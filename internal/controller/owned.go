@@ -2,15 +2,93 @@ package controller
 
 import (
 	"context"
+	"errors"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
 	"github.com/mahdidarabi/KArkive/internal/resources"
 )
+
+// ownedResources is the ConfigMap + optional PVC + CronJob for one Backup or Restore.
+type ownedResources struct {
+	Owner           client.Object
+	Name            string
+	Persistence     *karkivev1alpha1.PersistenceSpec
+	Labels          map[string]string
+	MutateConfigMap func(*corev1.ConfigMap) error
+	MutateCronJob   func(*batchv1.CronJob)
+}
+
+type ownedApplyError struct {
+	Reason string
+	Err    error
+}
+
+func (e *ownedApplyError) Error() string { return e.Err.Error() }
+func (e *ownedApplyError) Unwrap() error { return e.Err }
+
+func ownedReason(err error) string {
+	var ae *ownedApplyError
+	if errors.As(err, &ae) {
+		return ae.Reason
+	}
+	return "OwnedResourceError"
+}
+
+func applyOwnedError(reason string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return &ownedApplyError{Reason: reason, Err: err}
+}
+
+// ensureOwned creates or updates the ConfigMap, optional PVC, and CronJob for a CR.
+func ensureOwned(ctx context.Context, c client.Client, scheme *runtime.Scheme, spec ownedResources) (*batchv1.CronJob, error) {
+	ns := spec.Owner.GetNamespace()
+	setOwner := func(obj client.Object) error {
+		return controllerutil.SetControllerReference(spec.Owner, obj, scheme, controllerutil.WithBlockOwnerDeletion(false))
+	}
+
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: spec.Name, Namespace: ns}}
+	if _, err := controllerutil.CreateOrUpdate(ctx, c, cm, func() error {
+		if err := spec.MutateConfigMap(cm); err != nil {
+			return err
+		}
+		return setOwner(cm)
+	}); err != nil {
+		return nil, applyOwnedError("ConfigMapError", err)
+	}
+
+	if resources.PersistenceEnabled(spec.Persistence) {
+		pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: spec.Name, Namespace: ns}}
+		if _, err := controllerutil.CreateOrUpdate(ctx, c, pvc, func() error {
+			if !pvc.CreationTimestamp.IsZero() {
+				pvc.Labels = spec.Labels
+				return setOwner(pvc)
+			}
+			resources.MutatePVC(pvc, spec.Persistence, spec.Labels)
+			return setOwner(pvc)
+		}); err != nil {
+			return nil, applyOwnedError("PVCError", err)
+		}
+	}
+
+	cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Name: spec.Name, Namespace: ns}}
+	if _, err := controllerutil.CreateOrUpdate(ctx, c, cj, func() error {
+		spec.MutateCronJob(cj)
+		return setOwner(cj)
+	}); err != nil {
+		return nil, applyOwnedError("CronJobError", err)
+	}
+	return cj, nil
+}
 
 // deleteLegacyOwned removes the pre-0.0.4 ConfigMap and CronJob named
 // karkive-<cr-name> when this CR still owns them. The PVC is left in place

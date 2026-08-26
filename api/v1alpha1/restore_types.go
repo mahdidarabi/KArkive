@@ -5,16 +5,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RestoreImages overrides container images for restore pipeline stages.
-type RestoreImages struct {
-	BusyBox  *ImageSpec `json:"busybox,omitempty"`
-	GnuPG    *ImageSpec `json:"gnupg,omitempty"`
-	Postgres *ImageSpec `json:"postgres,omitempty"`
-	Mc       *ImageSpec `json:"mc,omitempty"`
-	MariaDB  *ImageSpec `json:"mariadb,omitempty"`
-	Redis    *ImageSpec `json:"redis,omitempty"`
-}
-
 // RestoreResources overrides CPU/memory/ephemeral-storage per pipeline stage.
 type RestoreResources struct {
 	Cleanup *corev1.ResourceRequirements `json:"cleanup,omitempty"`
@@ -80,7 +70,7 @@ type RestoreSpec struct {
 	StripPgAuditExtension *bool `json:"stripPgAuditExtension,omitempty"`
 
 	// Images overrides operator-wide default images.
-	Images *RestoreImages `json:"images,omitempty"`
+	Images *ImageSet `json:"images,omitempty"`
 
 	// Resources overrides per-stage resource requests/limits.
 	Resources *RestoreResources `json:"resources,omitempty"`

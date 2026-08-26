@@ -6,57 +6,28 @@ import (
 	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
 )
 
-// MutateBackupPVC writes the PVC spec. Call only when creating; spec is mostly immutable.
-func MutateBackupPVC(pvc *corev1.PersistentVolumeClaim, backup *karkivev1alpha1.Backup) {
-	p := backup.Spec.Persistence
+// MutatePVC writes the PVC spec. Call only when creating; spec is mostly immutable.
+func MutatePVC(pvc *corev1.PersistentVolumeClaim, persistence *karkivev1alpha1.PersistenceSpec, labels map[string]string) {
 	accessModes := []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
-	if p != nil && len(p.AccessModes) > 0 {
-		accessModes = p.AccessModes
+	if persistence != nil && len(persistence.AccessModes) > 0 {
+		accessModes = persistence.AccessModes
 	}
 
-	pvc.Labels = BackupLabels(backup)
-	if p != nil && len(p.Annotations) > 0 {
-		pvc.Annotations = p.Annotations
+	pvc.Labels = labels
+	if persistence != nil && len(persistence.Annotations) > 0 {
+		pvc.Annotations = persistence.Annotations
 	}
 
 	spec := corev1.PersistentVolumeClaimSpec{
 		AccessModes: accessModes,
 		Resources: corev1.VolumeResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceStorage: persistenceSize(p),
+				corev1.ResourceStorage: persistenceSize(persistence),
 			},
 		},
 	}
-	if p != nil && p.StorageClassName != "" {
-		sc := p.StorageClassName
-		spec.StorageClassName = &sc
-	}
-	pvc.Spec = spec
-}
-
-// MutateRestorePVC writes the PVC spec. Call only when creating; spec is mostly immutable.
-func MutateRestorePVC(pvc *corev1.PersistentVolumeClaim, restore *karkivev1alpha1.Restore) {
-	p := restore.Spec.Persistence
-	accessModes := []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
-	if p != nil && len(p.AccessModes) > 0 {
-		accessModes = p.AccessModes
-	}
-
-	pvc.Labels = RestoreLabels(restore)
-	if p != nil && len(p.Annotations) > 0 {
-		pvc.Annotations = p.Annotations
-	}
-
-	spec := corev1.PersistentVolumeClaimSpec{
-		AccessModes: accessModes,
-		Resources: corev1.VolumeResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceStorage: persistenceSize(p),
-			},
-		},
-	}
-	if p != nil && p.StorageClassName != "" {
-		sc := p.StorageClassName
+	if persistence != nil && persistence.StorageClassName != "" {
+		sc := persistence.StorageClassName
 		spec.StorageClassName = &sc
 	}
 	pvc.Spec = spec

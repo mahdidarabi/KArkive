@@ -111,7 +111,8 @@ spec:
                 description: Images overrides operator-wide default images.
                 properties:
                   busybox:
-                    description: BusyBox is used for cleanup and compress (find, gzip).
+                    description: BusyBox is used for cleanup, compress, and extract
+                      (find, gzip).
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -121,7 +122,7 @@ spec:
                         type: string
                     type: object
                   gnupg:
-                    description: GnuPG is used for encrypt.
+                    description: GnuPG is used for encrypt and decrypt.
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -141,7 +142,8 @@ spec:
                         type: string
                     type: object
                   mc:
-                    description: Mc is the minio client image used for s3-sync.
+                    description: Mc is the minio client image used for s3-sync and
+                      fetch.
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -151,7 +153,7 @@ spec:
                         type: string
                     type: object
                   postgres:
-                    description: Postgres is used for pgdump (pg_dump / psql).
+                    description: Postgres is used for pg_dump / pg_restore / psql.
                     properties:
                       image:
                         description: Image is registry/repository:tag.
@@ -161,7 +163,7 @@ spec:
                         type: string
                     type: object
                   redis:
-                    description: Redis is used for redis-cli --rdb dump and restore.
+                    description: Redis is used for redis-cli dump and restore.
                     properties:
                       image:
                         description: Image is registry/repository:tag.

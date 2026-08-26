@@ -168,7 +168,7 @@ func backupStageResources(backup *karkivev1alpha1.Backup) (cleanup, dump, compre
 	return
 }
 
-func persistenceEnabled(p *karkivev1alpha1.PersistenceSpec) bool {
+func PersistenceEnabled(p *karkivev1alpha1.PersistenceSpec) bool {
 	if p == nil || p.Enabled == nil {
 		return true
 	}
@@ -182,90 +182,48 @@ func persistenceSize(p *karkivev1alpha1.PersistenceSpec) resource.Quantity {
 	return resource.MustParse("1Gi")
 }
 
-func postgresImage(backup *karkivev1alpha1.Backup, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(imageOverride(backup, func(i *karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec {
+func postgresImage(images *karkivev1alpha1.ImageSet, cfg config.Config) (string, corev1.PullPolicy) {
+	return pipelineImage(images, func(i *karkivev1alpha1.ImageSet) *karkivev1alpha1.ImageSpec {
 		return i.Postgres
-	}), cfg.PostgresImage, config.DefaultPostgresImage)
+	}, cfg.PostgresImage, config.DefaultPostgresImage)
 }
 
-func mcImage(backup *karkivev1alpha1.Backup, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(imageOverride(backup, func(i *karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec {
+func mcImage(images *karkivev1alpha1.ImageSet, cfg config.Config) (string, corev1.PullPolicy) {
+	return pipelineImage(images, func(i *karkivev1alpha1.ImageSet) *karkivev1alpha1.ImageSpec {
 		return i.Mc
-	}), cfg.McImage, config.DefaultMcImage)
+	}, cfg.McImage, config.DefaultMcImage)
 }
 
-func busyBoxImage(backup *karkivev1alpha1.Backup, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(imageOverride(backup, func(i *karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec {
+func busyBoxImage(images *karkivev1alpha1.ImageSet, cfg config.Config) (string, corev1.PullPolicy) {
+	return pipelineImage(images, func(i *karkivev1alpha1.ImageSet) *karkivev1alpha1.ImageSpec {
 		return i.BusyBox
-	}), cfg.BusyBoxImage, config.DefaultBusyBoxImage)
+	}, cfg.BusyBoxImage, config.DefaultBusyBoxImage)
 }
 
-func gnuPGImage(backup *karkivev1alpha1.Backup, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(imageOverride(backup, func(i *karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec {
+func gnuPGImage(images *karkivev1alpha1.ImageSet, cfg config.Config) (string, corev1.PullPolicy) {
+	return pipelineImage(images, func(i *karkivev1alpha1.ImageSet) *karkivev1alpha1.ImageSpec {
 		return i.GnuPG
-	}), cfg.GnuPGImage, config.DefaultGnuPGImage)
+	}, cfg.GnuPGImage, config.DefaultGnuPGImage)
 }
 
-func mariadbImage(backup *karkivev1alpha1.Backup, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(imageOverride(backup, func(i *karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec {
+func mariadbImage(images *karkivev1alpha1.ImageSet, cfg config.Config) (string, corev1.PullPolicy) {
+	return pipelineImage(images, func(i *karkivev1alpha1.ImageSet) *karkivev1alpha1.ImageSpec {
 		return i.MariaDB
-	}), cfg.MariaDBImage, config.DefaultMariaDBImage)
+	}, cfg.MariaDBImage, config.DefaultMariaDBImage)
 }
 
-func redisImage(backup *karkivev1alpha1.Backup, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(imageOverride(backup, func(i *karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec {
+func redisImage(images *karkivev1alpha1.ImageSet, cfg config.Config) (string, corev1.PullPolicy) {
+	return pipelineImage(images, func(i *karkivev1alpha1.ImageSet) *karkivev1alpha1.ImageSpec {
 		return i.Redis
-	}), cfg.RedisImage, config.DefaultRedisImage)
+	}, cfg.RedisImage, config.DefaultRedisImage)
 }
 
-func restorePostgresImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
-		return i.Postgres
-	}), cfg.PostgresImage, config.DefaultPostgresImage)
-}
-
-func restoreMcImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
-		return i.Mc
-	}), cfg.McImage, config.DefaultMcImage)
-}
-
-func restoreBusyBoxImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
-		return i.BusyBox
-	}), cfg.BusyBoxImage, config.DefaultBusyBoxImage)
-}
-
-func restoreGnuPGImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
-		return i.GnuPG
-	}), cfg.GnuPGImage, config.DefaultGnuPGImage)
-}
-
-func restoreMariaDBImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
-		return i.MariaDB
-	}), cfg.MariaDBImage, config.DefaultMariaDBImage)
-}
-
-func restoreRedisImage(restore *karkivev1alpha1.Restore, cfg config.Config) (string, corev1.PullPolicy) {
-	return resolveImage(restoreImageOverride(restore, func(i *karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec {
-		return i.Redis
-	}), cfg.RedisImage, config.DefaultRedisImage)
-}
-
-func restoreImageOverride(restore *karkivev1alpha1.Restore, pick func(*karkivev1alpha1.RestoreImages) *karkivev1alpha1.ImageSpec) *karkivev1alpha1.ImageSpec {
-	if restore.Spec.Images == nil {
-		return nil
+func pipelineImage(images *karkivev1alpha1.ImageSet, pick func(*karkivev1alpha1.ImageSet) *karkivev1alpha1.ImageSpec, configured, fallback string) (string, corev1.PullPolicy) {
+	var override *karkivev1alpha1.ImageSpec
+	if images != nil {
+		override = pick(images)
 	}
-	return pick(restore.Spec.Images)
-}
-
-func imageOverride(backup *karkivev1alpha1.Backup, pick func(*karkivev1alpha1.BackupImages) *karkivev1alpha1.ImageSpec) *karkivev1alpha1.ImageSpec {
-	if backup.Spec.Images == nil {
-		return nil
-	}
-	return pick(backup.Spec.Images)
+	return resolveImage(override, configured, fallback)
 }
 
 func resolveImage(override *karkivev1alpha1.ImageSpec, configured, fallback string) (string, corev1.PullPolicy) {

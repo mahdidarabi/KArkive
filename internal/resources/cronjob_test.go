@@ -440,3 +440,29 @@ func hasEnv(c corev1.Container, name string) bool {
 	}
 	return false
 }
+
+func TestImageSet_SharedByBackupAndRestore(t *testing.T) {
+	images := &karkivev1alpha1.ImageSet{
+		BusyBox:  &karkivev1alpha1.ImageSpec{Image: "busybox:custom"},
+		Postgres: &karkivev1alpha1.ImageSpec{Image: "postgres:custom"},
+	}
+	backup := testBackup()
+	backup.Spec.Images = images
+	restore := testRestore()
+	restore.Spec.Images = images
+
+	bcj := &batchv1.CronJob{}
+	MutateBackupCronJob(bcj, backup, config.Config{})
+	rcj := &batchv1.CronJob{}
+	MutateRestoreCronJob(rcj, restore, config.Config{})
+
+	if bcj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image != "busybox:custom" {
+		t.Errorf("backup cleanup image=%s", bcj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image)
+	}
+	if rcj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image != "busybox:custom" {
+		t.Errorf("restore cleanup image=%s", rcj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image)
+	}
+	if bcj.Spec.JobTemplate.Spec.Template.Spec.Containers[1].Image != "postgres:custom" {
+		t.Errorf("backup dump image=%s", bcj.Spec.JobTemplate.Spec.Template.Spec.Containers[1].Image)
+	}
+}
