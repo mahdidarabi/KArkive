@@ -102,6 +102,8 @@ const (
 
 // RestoreStatus defines the observed state of Restore.
 type RestoreStatus struct {
+	// Phase is admission of owned resources: Pending, Ready, Error, Unsupported.
+	// It is not the last Job outcome; see RestoreSucceeded.
 	Phase              string       `json:"phase,omitempty"`
 	ObservedGeneration int64        `json:"observedGeneration,omitempty"`
 	CronJobName        string       `json:"cronJobName,omitempty"`
@@ -109,6 +111,8 @@ type RestoreStatus struct {
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 	// LastJob is the most recently finished Job, including failure reason.
 	LastJob *LastJobStatus `json:"lastJob,omitempty"`
+	// Conditions of the Restore. Ready is admission/sync of owned resources.
+	// RestoreSucceeded is the last finished Job (Unknown until one exists).
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -120,6 +124,7 @@ type RestoreStatus struct {
 // +kubebuilder:printcolumn:name="Engine",type=string,JSONPath=".spec.engine"
 // +kubebuilder:printcolumn:name="Schedule",type=string,JSONPath=".spec.schedule"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="Succeeded",type=string,JSONPath=".status.conditions[?(@.type=='RestoreSucceeded')].status"
 // +kubebuilder:printcolumn:name="Last Job",type=string,JSONPath=".status.lastJob.outcome"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 

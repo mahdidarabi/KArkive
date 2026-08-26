@@ -1,7 +1,7 @@
 # KArkive
 
 [![CI](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml/badge.svg)](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml)
-[![Helm](https://img.shields.io/badge/Helm-0.0.5-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
+[![Helm](https://img.shields.io/badge/Helm-0.0.6-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
 [![Image](https://img.shields.io/badge/GHCR-karkive-blue?logo=github)](https://github.com/mahdidarabi/KArkive/pkgs/container/karkive)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev/)
 [![Kubebuilder](https://img.shields.io/badge/API-karkive.io%2Fv1alpha1-326CE5?logo=kubernetes)](https://github.com/mahdidarabi/KArkive/tree/main/api/v1alpha1)
@@ -77,13 +77,13 @@ Redis restore starts an ephemeral `redis-server` in the Job and has the target `
 
 Images are published to `ghcr.io/mahdidarabi/karkive` from GitHub Actions on `main` (`latest`, `main`, `sha-<git-sha>`) and on tags `v*` (semver). Helm charts are pushed to GHCR on tags `v*`. `Chart.yaml` `version` and `appVersion` must match the tag without the `v` prefix.
 
-Current release: **`0.0.5`**
+Current release: **`0.0.6`**
 
 ```bash
-helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.5
+helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.6
 
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.5 \
+  --version 0.0.6 \
   -n karkive-system --create-namespace
 ```
 
@@ -91,7 +91,7 @@ With Prometheus Operator scrape, alerts, and a Grafana dashboard ConfigMap:
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.5 \
+  --version 0.0.6 \
   -n karkive-system --create-namespace \
   --set metrics.serviceMonitor.enabled=true \
   --set metrics.prometheusRule.enabled=true \
@@ -102,7 +102,7 @@ On GitOps (Argo CD), prefer cert-manager for webhook serving certs so Helm does 
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.5 \
+  --version 0.0.6 \
   -n karkive-system --create-namespace \
   --set webhook.certManager.enabled=true
 ```
@@ -258,9 +258,9 @@ See [`config/samples/backup-secret.yaml`](config/samples/backup-secret.yaml).
 
 ## Status
 
-Phases: `Pending` · `Ready` · `Error` · `Unsupported`.
+`status.phase` and the **Ready** condition are only admission of owned resources (`Pending` · `Ready` · `Error` · `Unsupported`). They stay `Ready` while the CronJob is synced even if the last dump failed.
 
-Status copies CronJob schedule/success times and the last finished Job:
+Last Job outcome is **BackupSucceeded** / **RestoreSucceeded** (`True` / `False` / `Unknown` until a Job finishes) plus `status.lastJob`:
 
 ```yaml
 status:
@@ -273,6 +273,13 @@ status:
     outcome: Succeeded   # or Failed
     reason: DeadlineExceeded
     message: "Job was active longer than specified deadline"
+  conditions:
+    - type: Ready
+      status: "True"
+      reason: Synced
+    - type: BackupSucceeded
+      status: "True"      # False if last Job failed; Unknown if none has finished
+      reason: JobSucceeded
 ```
 
 ```bash
@@ -280,7 +287,7 @@ kubectl get bak,res -A
 kubectl describe backup app-postgres -n backup
 ```
 
-Print columns include engine, schedule, phase, last success (Backup), and last Job outcome.
+Print columns include engine, schedule, phase, Succeeded, last success (Backup), and last Job outcome.
 
 ## Monitoring
 
@@ -290,7 +297,7 @@ Custom series are labeled `namespace`, `name`, `engine`:
 
 | Metric | Meaning |
 | --- | --- |
-| `karkive_backup_ready` / `karkive_restore_ready` | `1` when phase is `Ready` |
+| `karkive_backup_ready` / `karkive_restore_ready` | `1` when phase is `Ready` (resources synced; not last Job success) |
 | `karkive_backup_suspended` / `karkive_restore_suspended` | `spec.suspend` |
 | `karkive_backup_last_successful_timestamp_seconds` | Last successful Job |
 | `karkive_backup_last_job_failed` | Last finished Job failed |

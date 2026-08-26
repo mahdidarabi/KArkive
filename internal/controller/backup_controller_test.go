@@ -119,9 +119,13 @@ func TestBackupReconcile_CreatesOwnedResources(t *testing.T) {
 	if updated.Status.CronJobName != owned {
 		t.Errorf("status.cronJobName=%q", updated.Status.CronJobName)
 	}
-	cond := meta.FindStatusCondition(updated.Status.Conditions, conditionReady)
+	cond := meta.FindStatusCondition(updated.Status.Conditions, karkivev1alpha1.ConditionReady)
 	if cond == nil || cond.Status != metav1.ConditionTrue {
 		t.Errorf("ready condition=%v", cond)
+	}
+	succeeded := meta.FindStatusCondition(updated.Status.Conditions, karkivev1alpha1.ConditionBackupSucceeded)
+	if succeeded == nil || succeeded.Status != metav1.ConditionUnknown {
+		t.Errorf("BackupSucceeded=%v", succeeded)
 	}
 }
 
@@ -326,6 +330,65 @@ func TestBackupReconcile_CopiesLastJobFailure(t *testing.T) {
 	}
 	if updated.Status.LastJob.Reason != "BackoffLimitExceeded" {
 		t.Errorf("reason=%q", updated.Status.LastJob.Reason)
+	}
+	if updated.Status.Phase != karkivev1alpha1.BackupPhaseReady {
+		t.Errorf("phase=%q, want Ready (last Job must not overload phase)", updated.Status.Phase)
+	}
+	ready := meta.FindStatusCondition(updated.Status.Conditions, karkivev1alpha1.ConditionReady)
+	if ready == nil || ready.Status != metav1.ConditionTrue {
+		t.Errorf("Ready=%v", ready)
+	}
+	succeeded := meta.FindStatusCondition(updated.Status.Conditions, karkivev1alpha1.ConditionBackupSucceeded)
+	if succeeded == nil || succeeded.Status != metav1.ConditionFalse {
+		t.Errorf("BackupSucceeded=%v", succeeded)
+	}
+	if succeeded != nil && succeeded.Reason != "BackoffLimitExceeded" {
+		t.Errorf("BackupSucceeded.reason=%q", succeeded.Reason)
+	}
+}
+
+func TestBackupReconcile_LastJobSuccessSetsBackupSucceeded(t *testing.T) {
+	scheme := testScheme(t)
+	backup := testBackupCR()
+	secret := testBackupSecret()
+	done := metav1.Now()
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "karkive-backup-app-postgres-1",
+			Namespace: backup.Namespace,
+			Labels: map[string]string{
+				resources.LabelAppManagedBy: resources.ManagedBy,
+				resources.LabelKind:         resources.KindBackup,
+				resources.LabelBackupName:   backup.Name,
+			},
+		},
+		Status: batchv1.JobStatus{
+			Succeeded:      1,
+			StartTime:      &done,
+			CompletionTime: &done,
+		},
+	}
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(backup, secret, job).
+		WithStatusSubresource(&karkivev1alpha1.Backup{}).
+		Build()
+	r := &BackupReconciler{Client: c, Scheme: scheme, Recorder: record.NewFakeRecorder(8)}
+	if _, err := r.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	updated := &karkivev1alpha1.Backup{}
+	if err := c.Get(context.Background(), client.ObjectKeyFromObject(backup), updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status.Phase != karkivev1alpha1.BackupPhaseReady {
+		t.Errorf("phase=%q", updated.Status.Phase)
+	}
+	succeeded := meta.FindStatusCondition(updated.Status.Conditions, karkivev1alpha1.ConditionBackupSucceeded)
+	if succeeded == nil || succeeded.Status != metav1.ConditionTrue {
+		t.Errorf("BackupSucceeded=%v", succeeded)
 	}
 }
 

@@ -140,6 +140,14 @@ type JobPolicy struct {
 const (
 	LastJobOutcomeSucceeded = "Succeeded"
 	LastJobOutcomeFailed    = "Failed"
+
+	// ConditionReady is True when owned resources are admitted and synced.
+	// It does not reflect whether the last Job succeeded.
+	ConditionReady = "Ready"
+	// ConditionBackupSucceeded is True when the last finished Backup Job succeeded.
+	ConditionBackupSucceeded = "BackupSucceeded"
+	// ConditionRestoreSucceeded is True when the last finished Restore Job succeeded.
+	ConditionRestoreSucceeded = "RestoreSucceeded"
 )
 
 // LastJobStatus is the most recently finished Job for a Backup or Restore.

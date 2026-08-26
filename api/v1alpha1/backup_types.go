@@ -90,7 +90,8 @@ const (
 
 // BackupStatus defines the observed state of Backup.
 type BackupStatus struct {
-	// Phase is a high-level summary: Pending, Ready, Error, Unsupported.
+	// Phase is admission of owned resources: Pending, Ready, Error, Unsupported.
+	// It is not the last Job outcome; see BackupSucceeded.
 	Phase string `json:"phase,omitempty"`
 
 	// ObservedGeneration is the spec generation last processed by the controller.
@@ -108,7 +109,8 @@ type BackupStatus struct {
 	// LastJob is the most recently finished Job, including failure reason.
 	LastJob *LastJobStatus `json:"lastJob,omitempty"`
 
-	// Conditions of the Backup. Type Ready is always set after a reconcile.
+	// Conditions of the Backup. Ready is admission/sync of owned resources.
+	// BackupSucceeded is the last finished Job (Unknown until one exists).
 	// +listType=map
 	// +listMapKey=type
 	// +patchMergeKey=type
@@ -122,6 +124,7 @@ type BackupStatus struct {
 // +kubebuilder:printcolumn:name="Engine",type=string,JSONPath=".spec.engine"
 // +kubebuilder:printcolumn:name="Schedule",type=string,JSONPath=".spec.schedule"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="Succeeded",type=string,JSONPath=".status.conditions[?(@.type=='BackupSucceeded')].status"
 // +kubebuilder:printcolumn:name="Last Success",type=date,JSONPath=".status.lastSuccessfulTime"
 // +kubebuilder:printcolumn:name="Last Job",type=string,JSONPath=".status.lastJob.outcome"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"

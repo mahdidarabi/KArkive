@@ -18,7 +18,7 @@ import (
 var (
 	backupReadyDesc = prometheus.NewDesc(
 		"karkive_backup_ready",
-		"1 if the Backup status phase is Ready.",
+		"1 if the Backup is Ready (owned resources synced). Last Job outcome is karkive_backup_last_job_failed.",
 		[]string{"namespace", "name", "engine"},
 		nil,
 	)
@@ -61,7 +61,7 @@ var (
 
 	restoreReadyDesc = prometheus.NewDesc(
 		"karkive_restore_ready",
-		"1 if the Restore status phase is Ready.",
+		"1 if the Restore is Ready (owned resources synced). Last Job outcome is karkive_restore_last_job_failed.",
 		[]string{"namespace", "name", "engine"},
 		nil,
 	)

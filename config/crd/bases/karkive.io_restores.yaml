@@ -27,6 +27,9 @@ spec:
     - jsonPath: .status.phase
       name: Phase
       type: string
+    - jsonPath: .status.conditions[?(@.type=='RestoreSucceeded')].status
+      name: Succeeded
+      type: string
     - jsonPath: .status.lastJob.outcome
       name: Last Job
       type: string
@@ -675,6 +678,9 @@ spec:
             description: RestoreStatus defines the observed state of Restore.
             properties:
               conditions:
+                description: |-
+                  Conditions of the Restore. Ready is admission/sync of owned resources.
+                  RestoreSucceeded is the last finished Job (Unknown until one exists).
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -772,6 +778,9 @@ spec:
                 format: int64
                 type: integer
               phase:
+                description: |-
+                  Phase is admission of owned resources: Pending, Ready, Error, Unsupported.
+                  It is not the last Job outcome; see RestoreSucceeded.
                 type: string
             type: object
         type: object

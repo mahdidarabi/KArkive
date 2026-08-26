@@ -1,8 +1,11 @@
 package controller
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
@@ -14,6 +17,43 @@ func lastJobEqual(a, b *karkivev1alpha1.LastJobStatus) bool {
 
 func metaTimeEqual(a, b *metav1.Time) bool {
 	return equality.Semantic.DeepEqual(a, b)
+}
+
+// setJobSucceededCondition writes BackupSucceeded / RestoreSucceeded from lastJob.
+// Unknown until a Job has finished. Does not change Ready or phase.
+func setJobSucceededCondition(conditions *[]metav1.Condition, condType string, generation int64, lastJob *karkivev1alpha1.LastJobStatus) bool {
+	cond := metav1.Condition{
+		Type:               condType,
+		ObservedGeneration: generation,
+	}
+	switch {
+	case lastJob == nil:
+		cond.Status = metav1.ConditionUnknown
+		cond.Reason = "NoFinishedJob"
+		cond.Message = "No finished Job yet"
+	case lastJob.Outcome == karkivev1alpha1.LastJobOutcomeSucceeded:
+		cond.Status = metav1.ConditionTrue
+		cond.Reason = "JobSucceeded"
+		if lastJob.Name != "" {
+			cond.Message = fmt.Sprintf("Job %s succeeded", lastJob.Name)
+		} else {
+			cond.Message = "Last Job succeeded"
+		}
+	default:
+		cond.Status = metav1.ConditionFalse
+		cond.Reason = lastJob.Reason
+		if cond.Reason == "" {
+			cond.Reason = "JobFailed"
+		}
+		if lastJob.Message != "" {
+			cond.Message = lastJob.Message
+		} else if lastJob.Name != "" {
+			cond.Message = fmt.Sprintf("Job %s failed", lastJob.Name)
+		} else {
+			cond.Message = "Last Job failed"
+		}
+	}
+	return meta.SetStatusCondition(conditions, cond)
 }
 
 // generationChanged is true on create (status not yet observed) or when spec

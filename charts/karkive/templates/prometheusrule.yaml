@@ -21,7 +21,7 @@ spec:
             severity: warning
           annotations:
             summary: Backup {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} is not Ready
-            description: The Backup CR has not been Ready for 15m (engine={{`{{ $labels.engine }}`}}).
+            description: Owned resources have not been Ready for 15m (engine={{`{{ $labels.engine }}`}}). Last Job outcome is a separate alert.
         - alert: KArkiveRestoreNotReady
           expr: karkive_restore_ready == 0
           for: 15m
@@ -29,7 +29,7 @@ spec:
             severity: warning
           annotations:
             summary: Restore {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} is not Ready
-            description: The Restore CR has not been Ready for 15m (engine={{`{{ $labels.engine }}`}}).
+            description: Owned resources have not been Ready for 15m (engine={{`{{ $labels.engine }}`}}). Last Job outcome is a separate alert.
         - alert: KArkiveBackupJobFailed
           expr: karkive_backup_last_job_info{outcome="Failed"} == 1
           for: 15m

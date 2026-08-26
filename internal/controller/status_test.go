@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	karkivev1alpha1 "github.com/mahdidarabi/KArkive/api/v1alpha1"
 )
@@ -74,5 +76,44 @@ func TestLastJobEqual(t *testing.T) {
 	}
 	if !lastJobEqual(nil, nil) {
 		t.Fatal("nil lastJob should be equal")
+	}
+}
+
+func TestSetJobSucceededCondition(t *testing.T) {
+	t.Parallel()
+	var conds []metav1.Condition
+	if !setJobSucceededCondition(&conds, karkivev1alpha1.ConditionBackupSucceeded, 1, nil) {
+		t.Fatal("expected change when adding Unknown")
+	}
+	c := meta.FindStatusCondition(conds, karkivev1alpha1.ConditionBackupSucceeded)
+	if c == nil || c.Status != metav1.ConditionUnknown || c.Reason != "NoFinishedJob" {
+		t.Fatalf("nil lastJob: %+v", c)
+	}
+	if setJobSucceededCondition(&conds, karkivev1alpha1.ConditionBackupSucceeded, 1, nil) {
+		t.Fatal("repeat Unknown must not report change")
+	}
+
+	if !setJobSucceededCondition(&conds, karkivev1alpha1.ConditionBackupSucceeded, 1, &karkivev1alpha1.LastJobStatus{
+		Name:    "job-ok",
+		Outcome: karkivev1alpha1.LastJobOutcomeSucceeded,
+	}) {
+		t.Fatal("expected change on success")
+	}
+	c = meta.FindStatusCondition(conds, karkivev1alpha1.ConditionBackupSucceeded)
+	if c.Status != metav1.ConditionTrue || c.Reason != "JobSucceeded" {
+		t.Fatalf("success: %+v", c)
+	}
+
+	if !setJobSucceededCondition(&conds, karkivev1alpha1.ConditionBackupSucceeded, 1, &karkivev1alpha1.LastJobStatus{
+		Name:    "job-bad",
+		Outcome: karkivev1alpha1.LastJobOutcomeFailed,
+		Reason:  "BackoffLimitExceeded",
+		Message: "backoff",
+	}) {
+		t.Fatal("expected change on failure")
+	}
+	c = meta.FindStatusCondition(conds, karkivev1alpha1.ConditionBackupSucceeded)
+	if c.Status != metav1.ConditionFalse || c.Reason != "BackoffLimitExceeded" || c.Message != "backoff" {
+		t.Fatalf("failure: %+v", c)
 	}
 }

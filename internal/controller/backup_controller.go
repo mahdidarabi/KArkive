@@ -24,8 +24,7 @@ import (
 )
 
 const (
-	conditionReady = "Ready"
-	secretRequeue  = 30 * time.Second
+	secretRequeue = 30 * time.Second
 )
 
 var requiredBackupSecretKeys = []string{
@@ -200,18 +199,20 @@ func (r *BackupReconciler) setStatus(
 		backup.Status.LastSuccessfulTime = cron.Status.LastSuccessfulTime
 	}
 
-	condChanged := meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
-		Type:               conditionReady,
+	readyChanged := meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+		Type:               karkivev1alpha1.ConditionReady,
 		Status:             ready,
 		Reason:             reason,
 		Message:            message,
 		ObservedGeneration: backup.Generation,
 	})
+	succeededChanged := setJobSucceededCondition(&backup.Status.Conditions, karkivev1alpha1.ConditionBackupSucceeded, backup.Generation, newLastJob)
+	condChanged := readyChanged || succeededChanged
 	backup.Status.LastJob = newLastJob
 	backup.Status.Phase = phase
 	backup.Status.ObservedGeneration = backup.Generation
 
-	if r.Recorder != nil && shouldRecordEvent(eventType, specChanged, phaseChanged, condChanged) {
+	if r.Recorder != nil && shouldRecordEvent(eventType, specChanged, phaseChanged, readyChanged) {
 		r.Recorder.Event(backup, eventType, reason, message)
 	}
 	if !statusNeedsPatch(specChanged, phaseChanged, condChanged, lastJobChanged, cronChanged) {

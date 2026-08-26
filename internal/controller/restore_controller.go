@@ -209,18 +209,20 @@ func (r *RestoreReconciler) setStatus(
 		restore.Status.LastSuccessfulTime = cron.Status.LastSuccessfulTime
 	}
 
-	condChanged := meta.SetStatusCondition(&restore.Status.Conditions, metav1.Condition{
-		Type:               conditionReady,
+	readyChanged := meta.SetStatusCondition(&restore.Status.Conditions, metav1.Condition{
+		Type:               karkivev1alpha1.ConditionReady,
 		Status:             ready,
 		Reason:             reason,
 		Message:            message,
 		ObservedGeneration: restore.Generation,
 	})
+	succeededChanged := setJobSucceededCondition(&restore.Status.Conditions, karkivev1alpha1.ConditionRestoreSucceeded, restore.Generation, newLastJob)
+	condChanged := readyChanged || succeededChanged
 	restore.Status.LastJob = newLastJob
 	restore.Status.Phase = phase
 	restore.Status.ObservedGeneration = restore.Generation
 
-	if r.Recorder != nil && shouldRecordEvent(eventType, specChanged, phaseChanged, condChanged) {
+	if r.Recorder != nil && shouldRecordEvent(eventType, specChanged, phaseChanged, readyChanged) {
 		r.Recorder.Event(restore, eventType, reason, message)
 	}
 	if !statusNeedsPatch(specChanged, phaseChanged, condChanged, lastJobChanged, cronChanged) {

@@ -27,6 +27,9 @@ spec:
     - jsonPath: .status.phase
       name: Phase
       type: string
+    - jsonPath: .status.conditions[?(@.type=='BackupSucceeded')].status
+      name: Succeeded
+      type: string
     - jsonPath: .status.lastSuccessfulTime
       name: Last Success
       type: date
@@ -616,8 +619,9 @@ spec:
             description: BackupStatus defines the observed state of Backup.
             properties:
               conditions:
-                description: Conditions of the Backup. Type Ready is always set after
-                  a reconcile.
+                description: |-
+                  Conditions of the Backup. Ready is admission/sync of owned resources.
+                  BackupSucceeded is the last finished Job (Unknown until one exists).
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -720,8 +724,9 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: 'Phase is a high-level summary: Pending, Ready, Error,
-                  Unsupported.'
+                description: |-
+                  Phase is admission of owned resources: Pending, Ready, Error, Unsupported.
+                  It is not the last Job outcome; see BackupSucceeded.
                 type: string
             type: object
         type: object
