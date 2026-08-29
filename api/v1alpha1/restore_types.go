@@ -49,6 +49,10 @@ type RestoreSpec struct {
 	// Persistence for the restore workdir. Set enabled=false for lite (emptyDir) restores.
 	Persistence *PersistenceSpec `json:"persistence,omitempty"`
 
+	// LogFileEnabled writes stage logs to logs/<pod>.log on the volume as well
+	// as stderr. Default false. Files older than 7 days are pruned.
+	LogFileEnabled *bool `json:"logFileEnabled,omitempty"`
+
 	// Workdir is the volume mount path. Default /workdir.
 	Workdir string `json:"workdir,omitempty"`
 

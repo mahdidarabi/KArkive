@@ -149,6 +149,11 @@ func (in *BackupSpec) DeepCopyInto(out *BackupSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.LogFileEnabled != nil {
+		in, out := &in.LogFileEnabled, &out.LogFileEnabled
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Images != nil {
 		in, out := &in.Images, &out.Images
 		*out = new(ImageSet)
@@ -526,6 +531,11 @@ func (in *RestoreSpec) DeepCopyInto(out *RestoreSpec) {
 		in, out := &in.Persistence, &out.Persistence
 		*out = new(PersistenceSpec)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.LogFileEnabled != nil {
+		in, out := &in.LogFileEnabled, &out.LogFileEnabled
+		*out = new(bool)
+		**out = **in
 	}
 	if in.UseLatestBackupAsFallback != nil {
 		in, out := &in.UseLatestBackupAsFallback, &out.UseLatestBackupAsFallback

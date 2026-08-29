@@ -1,7 +1,7 @@
 # KArkive
 
 [![CI](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml/badge.svg)](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml)
-[![Helm](https://img.shields.io/badge/Helm-0.0.7-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
+[![Helm](https://img.shields.io/badge/Helm-0.0.8-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
 [![Image](https://img.shields.io/badge/GHCR-karkive-blue?logo=github)](https://github.com/mahdidarabi/KArkive/pkgs/container/karkive)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev/)
 [![Kubebuilder](https://img.shields.io/badge/API-karkive.io%2Fv1alpha1-326CE5?logo=kubernetes)](https://github.com/mahdidarabi/KArkive/tree/main/api/v1alpha1)
@@ -77,13 +77,13 @@ Redis restore starts an ephemeral `redis-server` in the Job and has the target `
 
 Images are published to `ghcr.io/mahdidarabi/karkive` from GitHub Actions on `main` (`latest`, `main`, `sha-<git-sha>`) and on tags `v*` (semver). Helm charts are pushed to GHCR on tags `v*`. `Chart.yaml` `version` and `appVersion` must match the tag without the `v` prefix.
 
-Current release: **`0.0.7`**
+Current release: **`0.0.8`**
 
 ```bash
-helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.7
+helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.8
 
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.7 \
+  --version 0.0.8 \
   -n karkive-system --create-namespace
 ```
 
@@ -91,7 +91,7 @@ With Prometheus Operator scrape, alerts, and a Grafana dashboard ConfigMap:
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.7 \
+  --version 0.0.8 \
   -n karkive-system --create-namespace \
   --set metrics.serviceMonitor.enabled=true \
   --set metrics.prometheusRule.enabled=true \
@@ -102,7 +102,7 @@ On GitOps (Argo CD), prefer cert-manager for webhook serving certs so Helm does 
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.7 \
+  --version 0.0.8 \
   -n karkive-system --create-namespace \
   --set webhook.certManager.enabled=true
 ```
@@ -149,6 +149,7 @@ spec:
     size: 1Gi
     storageClassName: standard
   localRetentionDays: 7     # encrypted dumps kept on the PVC
+  logFileEnabled: false      # true → also write logs/<pod>.log on the volume
 ```
 
 MariaDB and Redis samples live under [`examples/`](examples/) (`backup-mariadb.yaml`, `backup-redis.yaml`).
@@ -158,6 +159,7 @@ Useful knobs:
 | Field | Default | Purpose |
 | --- | --- | --- |
 | `spec.s3.enabled` | `true` | Upload to S3. `false` keeps dumps in `retained/` on the PVC (requires persistence; no S3 keys) |
+| `spec.logFileEnabled` | `false` | Also write stage logs to `logs/<pod>.log` on the volume |
 | `spec.suspend` | `false` | Stop the schedule; CronJob remains for manual Jobs |
 | `spec.job.concurrencyPolicy` | `Forbid` | CronJob concurrency |
 | `spec.job.backoffLimit` | `3` | Job retries |
@@ -215,6 +217,7 @@ spec:
 | `spec.useLatestBackupAsFallback` | `true` | Newest dump matching the engine prefix when `backupFile` is empty or missing |
 | `spec.dropDatabaseIfExists` | `true` | Drop / replace a non-empty target first (`REPLICAOF` on Redis) |
 | `spec.stripPgAuditExtension` | `true` | Strip pgAudit DDL from Postgres dumps |
+| `spec.logFileEnabled` | `false` | Also write stage logs to `logs/<pod>.log` on the volume |
 | `spec.job.restartPolicy` | `Never` | Restore Jobs do not restart in-place |
 | `spec.job.backoffLimit` | `1` | Fail fast |
 

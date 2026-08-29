@@ -1,6 +1,19 @@
 # Shared pipeline helpers. Callers set STAGE and DATA_DIR (backup) or WORKDIR
 # (restore), then pipeline_init.
-log() { echo "[${STAGE:-pipeline} $(date '+%Y-%m-%dT%H:%M:%S%z')] $*" >&2; }
+log_file_enabled() {
+  case "${LOG_FILE_ENABLED:-false}" in
+    1|yes|YES|true|TRUE) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+log() {
+  msg="[${STAGE:-pipeline} $(date '+%Y-%m-%dT%H:%M:%S%z')] $*"
+  echo "$msg" >&2
+  if [ -n "${LOG_FILE:-}" ]; then
+    echo "$msg" >> "${LOG_FILE}" 2>/dev/null || true
+  fi
+}
 
 mark_failed() {
   # Group-writable so uid 1000 (mc), engine UIDs (postgres 26, mysql/redis 999),
@@ -21,7 +34,35 @@ pipeline_init() {
     exit 1
   fi
   mkdir -p "${STEP_DIR}"
+  if log_file_enabled; then
+    # Durable log file on the volume: DATA_ROOT/logs or WORKDIR_ROOT/logs.
+    # World-writable: stage UIDs do not share a write group besides fsGroup 26.
+    log_root="${DATA_ROOT:-${WORKDIR_ROOT:-}}"
+    if [ -n "$log_root" ]; then
+      LOG_DIR="${log_root}/logs"
+      mkdir -p "${LOG_DIR}" 2>/dev/null || true
+      chmod 777 "${LOG_DIR}" 2>/dev/null || true
+      LOG_FILE="${LOG_DIR}/${HOSTNAME:-pipeline}.log"
+      touch "${LOG_FILE}" 2>/dev/null || true
+      chmod 666 "${LOG_FILE}" 2>/dev/null || true
+    fi
+  fi
   trap 'ec=$?; [ "$ec" -eq 0 ] || mark_failed' EXIT
+}
+
+prune_pipeline_logs() {
+  log_file_enabled || return 0
+  root="${1:-}"
+  keep="${2:-${LOCAL_KEEP:-7}}"
+  [ -n "$root" ] || return 0
+  logs_dir="${root}/logs"
+  mkdir -p "${logs_dir}"
+  log "pruning pipeline logs under ${logs_dir} older than ${keep} day(s)"
+  find "${logs_dir}" -type f -name '*.log' -mtime "+${keep}" -print \
+    | while IFS= read -r f; do
+        log "deleted expired log ${f}"
+        rm -f "${f}"
+      done || true
 }
 
 wait_for() {

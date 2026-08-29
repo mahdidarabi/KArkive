@@ -10,10 +10,13 @@ func TestCommonScriptEmbedded(t *testing.T) {
 	if s == "" {
 		t.Fatal("common.sh is empty")
 	}
-	for _, fn := range []string{"log()", "wait_for()", "hold_until_job_done()", "mark_failed()", "pipeline_init()"} {
+	for _, fn := range []string{"log()", "wait_for()", "hold_until_job_done()", "mark_failed()", "pipeline_init()", "log_file_enabled()", "prune_pipeline_logs()"} {
 		if !strings.Contains(s, fn) {
 			t.Errorf("common.sh missing %s", fn)
 		}
+	}
+	if !strings.Contains(s, "LOG_FILE_ENABLED") {
+		t.Error("common.sh should append stage logs to LOG_FILE when LOG_FILE_ENABLED is set")
 	}
 }
 
@@ -89,6 +92,26 @@ func TestRedisRestoreUsesReplicaOf(t *testing.T) {
 	}
 	if strings.Contains(s, "FLUSHALL") {
 		t.Fatal("redisrestore.sh should not FLUSHALL; REPLICAOF replaces the dataset")
+	}
+}
+
+func TestCleanupKeepsLogsDir(t *testing.T) {
+	backup, err := BackupScript("cleanup.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(backup, "! -name logs") {
+		t.Error("backup cleanup.sh must not delete the logs/ directory")
+	}
+	if !strings.Contains(backup, "prune_pipeline_logs") {
+		t.Error("backup cleanup.sh should prune expired pipeline logs")
+	}
+	restore, err := RestoreScript("cleanup.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(restore, "! -name logs") {
+		t.Error("restore cleanup.sh must not delete the logs/ directory")
 	}
 }
 

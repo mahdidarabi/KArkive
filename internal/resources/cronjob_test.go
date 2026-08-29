@@ -49,6 +49,7 @@ func TestMutateBackupConfigMap_Postgres(t *testing.T) {
 		"S3_ENDPOINT": "https://s3.example.com",
 		"S3_BUCKET":   "backups",
 		"S3_ENABLED":  "true",
+		"LOG_FILE_ENABLED": "false",
 	}
 	for k, v := range want {
 		if cm.Data[k] != v {
@@ -145,6 +146,18 @@ func TestMutateBackupCronJob_S3Disabled(t *testing.T) {
 	}
 }
 
+func TestMutateBackupConfigMap_LogFileEnabled(t *testing.T) {
+	backup := testBackup()
+	backup.Spec.LogFileEnabled = ptr.To(true)
+	cm := &corev1.ConfigMap{}
+	if err := MutateBackupConfigMap(cm, backup, config.Config{}); err != nil {
+		t.Fatal(err)
+	}
+	if cm.Data["LOG_FILE_ENABLED"] != "true" {
+		t.Errorf("LOG_FILE_ENABLED=%q", cm.Data["LOG_FILE_ENABLED"])
+	}
+}
+
 func TestPersistenceDisabledUsesEmptyDir(t *testing.T) {
 	backup := testBackup()
 	backup.Spec.Persistence = &karkivev1alpha1.PersistenceSpec{Enabled: ptr.To(false)}
@@ -206,6 +219,7 @@ func TestMutateRestoreConfigMap_Postgres(t *testing.T) {
 		"USE_LATEST_BACKUP_AS_FALLBACK": "true",
 		"DROP_DATABASE_IF_EXISTS":       "true",
 		"STRIP_PGAUDIT_EXTENSION":       "true",
+		"LOG_FILE_ENABLED":              "false",
 	}
 	for k, v := range want {
 		if cm.Data[k] != v {

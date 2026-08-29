@@ -46,6 +46,10 @@ type BackupSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	LocalRetentionDays *int32 `json:"localRetentionDays,omitempty"`
 
+	// LogFileEnabled writes stage logs to logs/<pod>.log on the volume as well
+	// as stderr. Default false. Files older than LocalRetentionDays are pruned.
+	LogFileEnabled *bool `json:"logFileEnabled,omitempty"`
+
 	// DataDir is the volume mount path. Default /backup/data.
 	DataDir string `json:"dataDir,omitempty"`
 

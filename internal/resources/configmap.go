@@ -23,6 +23,7 @@ func MutateBackupConfigMap(cm *corev1.ConfigMap, backup *karkivev1alpha1.Backup,
 		"MC_CONFIG_DIR":        mcConfigDir(backup),
 		"LOCAL_RETENTION_DAYS": strconv.Itoa(int(localRetentionDays(backup))),
 		"S3_ENABLED":           boolEnv(backup.Spec.S3.Enabled, true),
+		"LOG_FILE_ENABLED":     boolEnv(backup.Spec.LogFileEnabled, false),
 	}
 	if backup.Spec.S3.EnabledOrDefault() {
 		cm.Data["S3_ENDPOINT"] = s3Endpoint(backup, cfg)

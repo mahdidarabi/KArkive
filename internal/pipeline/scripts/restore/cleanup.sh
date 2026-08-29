@@ -8,9 +8,11 @@ WORKDIR="${WORKDIR_ROOT}/${HOSTNAME}"
 pipeline_init
 log "stage start: cleanup root=${WORKDIR_ROOT}"
 # mc image has no find(1); this stage owns PVC process-dir pruning.
+LOCAL_KEEP="${LOCAL_RETENTION_DAYS:-7}"
+prune_pipeline_logs "${WORKDIR_ROOT}" "${LOCAL_KEEP}"
 log "removing old restore process dirs under ${WORKDIR_ROOT}"
 find "${WORKDIR_ROOT}" -mindepth 1 -maxdepth 1 -type d \
-  ! -name "${HOSTNAME}" ! -name lost+found -print \
+  ! -name "${HOSTNAME}" ! -name logs ! -name lost+found -print \
   | while IFS= read -r d; do
       log "removing old process dir ${d}"
       rm -rf "${d}"

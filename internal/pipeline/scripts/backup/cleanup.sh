@@ -15,6 +15,7 @@ LOCAL_KEEP="${LOCAL_RETENTION_DAYS:-7}"
 RETAINED_DIR="${DATA_ROOT}/retained"
 mkdir -p "${RETAINED_DIR}"
 log "local retention=${LOCAL_KEEP} day(s); pruning retained dumps under ${RETAINED_DIR}"
+prune_pipeline_logs "${DATA_ROOT}" "${LOCAL_KEEP}"
 DUMP_PREFIX="${DUMP_PREFIX:-pg_dump}"
 case "${DUMP_PREFIX}" in
   mysqldump) RETAINED_GLOB='mysqldump-*.sql.gz.gpg' ;;
@@ -36,10 +37,10 @@ find "${DATA_ROOT}" \( -path "${RETAINED_DIR}" -o -path "${DATA_DIR}" \) -prune 
       rm -f "${f}"
     done || true
 # Job scratch dirs ($HOSTNAME) are ephemeral once .gpg is in retained/.
-# Drop every prior process dir immediately (keep retained/ + lost+found).
-log "removing old process/scratch dirs (keep retained/ and current ${HOSTNAME})"
+# Drop every prior process dir immediately (keep retained/, logs/, lost+found).
+log "removing old process/scratch dirs (keep retained/, logs/, and current ${HOSTNAME})"
 find "${DATA_ROOT}" -mindepth 1 -maxdepth 1 -type d \
-  ! -name "${HOSTNAME}" ! -name retained ! -name lost+found -print \
+  ! -name "${HOSTNAME}" ! -name retained ! -name logs ! -name lost+found -print \
   | while IFS= read -r d; do
       log "removing old process dir ${d}"
       rm -rf "${d}"
