@@ -42,7 +42,7 @@ func MutateBackupCronJob(cj *batchv1.CronJob, backup *karkivev1alpha1.Backup, cf
 	if job.ConcurrencyPolicy != "" {
 		concurrency = batchv1.ConcurrencyPolicy(job.ConcurrencyPolicy)
 	}
-	restart := corev1.RestartPolicyOnFailure
+	restart := corev1.RestartPolicyNever
 	if job.RestartPolicy != "" {
 		restart = job.RestartPolicy
 	}

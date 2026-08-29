@@ -10,7 +10,7 @@ func TestCommonScriptEmbedded(t *testing.T) {
 	if s == "" {
 		t.Fatal("common.sh is empty")
 	}
-	for _, fn := range []string{"log()", "wait_for()", "hold_until_job_done()", "mark_failed()", "pipeline_init()", "log_file_enabled()", "prune_pipeline_logs()"} {
+	for _, fn := range []string{"log()", "wait_for()", "hold_until_job_done()", "mark_failed()", "pipeline_init()", "log_file_enabled()", "prune_pipeline_logs()", "already_done_hold()", "already_done_exit()", "clear_step_failed()"} {
 		if !strings.Contains(s, fn) {
 			t.Errorf("common.sh missing %s", fn)
 		}

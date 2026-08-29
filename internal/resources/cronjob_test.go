@@ -112,6 +112,9 @@ func TestMutateBackupCronJob_PostgresStages(t *testing.T) {
 	if !strings.Contains(script, "STAGE=cleanup") {
 		t.Error("cleanup script missing STAGE=cleanup")
 	}
+	if cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy != corev1.RestartPolicyNever {
+		t.Errorf("restartPolicy=%q, want Never", cj.Spec.JobTemplate.Spec.Template.Spec.RestartPolicy)
+	}
 }
 
 func TestMutateBackupCronJob_S3Disabled(t *testing.T) {

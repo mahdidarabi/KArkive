@@ -7,6 +7,7 @@ DATA_ROOT="${DATA_DIR:-${PGDUMP_DIR:?DATA_DIR or PGDUMP_DIR required}}"
 DATA_DIR="${DATA_ROOT}/${HOSTNAME}"
 pipeline_init
 wait_for "${DATA_DIR}/.step-encrypt-done" "encrypt"
+already_done_exit "${DATA_DIR}/.step-job-done" "s3-sync"
 log "stage start: s3-sync bucket=${S3_BUCKET} path=${S3_PATH}"
 log "configuring mc alias endpoint=${S3_ENDPOINT}"
 mc alias set backup "${S3_ENDPOINT}" "${S3_ACCESS_KEY}" "${S3_SECRET_KEY}"

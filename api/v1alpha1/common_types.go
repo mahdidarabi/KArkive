@@ -146,7 +146,8 @@ type JobPolicy struct {
 	// TTLSecondsAfterFinished. Default 86400.
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 
-	// RestartPolicy of the Pod. Default OnFailure for backup, Never for restore.
+	// RestartPolicy of the Pod. Default Never (backup and restore).
+	// OnFailure restarts one container in-place and can wipe pipeline markers.
 	RestartPolicy corev1.RestartPolicy `json:"restartPolicy,omitempty"`
 
 	// TimeZone for the CronJob schedule (Kubernetes 1.27+).

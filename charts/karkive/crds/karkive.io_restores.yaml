@@ -192,8 +192,9 @@ spec:
                     format: int32
                     type: integer
                   restartPolicy:
-                    description: RestartPolicy of the Pod. Default OnFailure for backup,
-                      Never for restore.
+                    description: |-
+                      RestartPolicy of the Pod. Default Never (backup and restore).
+                      OnFailure restarts one container in-place and can wipe pipeline markers.
                     type: string
                   startingDeadlineSeconds:
                     description: StartingDeadlineSeconds. Default 86400.

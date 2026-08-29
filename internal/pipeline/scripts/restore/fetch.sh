@@ -33,10 +33,12 @@ find_latest() {
   printf '%s' "${LATEST}"
 }
 wait_for "${WORKDIR}/.step-cleanup-done" "cleanup"
+already_done_hold "${WORKDIR}/.step-fetch-done" "fetch"
+clear_step_failed
 log "stage start: fetch bucket=${S3_BUCKET} path=${S3_PATH}"
 log "scratch dir=${WORKDIR}"
-log "clearing workdir markers/dumps under ${WORKDIR}"
-rm -f "${WORKDIR}/.step-"* "${WORKDIR}/dump"*
+log "clearing workdir dumps under ${WORKDIR} (keep .step-cleanup-done)"
+rm -f "${WORKDIR}/dump"*
 log "configuring mc alias endpoint=${S3_ENDPOINT}"
 mc alias set backup "${S3_ENDPOINT}" "${S3_ACCESS_KEY}" "${S3_SECRET_KEY}"
 PREFIX="backup/${S3_BUCKET}/${S3_PATH}"

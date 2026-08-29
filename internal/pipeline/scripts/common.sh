@@ -65,6 +65,36 @@ prune_pipeline_logs() {
       done || true
 }
 
+# If this container restarted after finishing, skip work. Cleanup must not
+# run `rm -f .step-*` again (that wipes in-flight dump/compress markers).
+already_done_hold() {
+  marker="$1"
+  name="$2"
+  if [ -f "${marker}" ]; then
+    log "already complete (${name}); skipping work"
+    hold_until_job_done
+    exit 0
+  fi
+}
+
+already_done_exit() {
+  marker="$1"
+  name="$2"
+  if [ -f "${marker}" ]; then
+    log "already complete (${name}); exiting"
+    exit 0
+  fi
+}
+
+# Dump/fetch retry in the same pod: drop a prior .step-failed so sibling
+# wait loops can proceed. Only call from the stage that is retrying work.
+clear_step_failed() {
+  if [ -f "${STEP_DIR}/.step-failed" ]; then
+    log "clearing .step-failed from a previous in-pod attempt"
+    rm -f "${STEP_DIR}/.step-failed"
+  fi
+}
+
 wait_for() {
   marker="$1"
   prev="$2"

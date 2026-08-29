@@ -7,6 +7,7 @@ WORKDIR_ROOT="${WORKDIR}"
 WORKDIR="${WORKDIR_ROOT}/${HOSTNAME}"
 pipeline_init
 wait_for "${WORKDIR}/.step-extract-done" "extract"
+already_done_exit "${WORKDIR}/.step-job-done" "mysqlrestore"
 
 DB="${MYSQL_DATABASE:-}"
 HOST="${MYSQL_HOST:-}"

@@ -7,6 +7,7 @@ WORKDIR_ROOT="${WORKDIR}"
 WORKDIR="${WORKDIR_ROOT}/${HOSTNAME}"
 pipeline_init
 wait_for "${WORKDIR}/.step-decrypt-done" "decrypt"
+already_done_hold "${WORKDIR}/.step-extract-done" "extract"
 log "stage start: extract (gunzip)"
 test -s "${WORKDIR}/dump.gz"
 log "gunzip dump.gz ($(wc -c < "${WORKDIR}/dump.gz") bytes)"

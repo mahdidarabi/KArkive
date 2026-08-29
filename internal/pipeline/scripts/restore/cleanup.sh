@@ -6,6 +6,7 @@ STAGE=cleanup
 WORKDIR_ROOT="${WORKDIR}"
 WORKDIR="${WORKDIR_ROOT}/${HOSTNAME}"
 pipeline_init
+already_done_hold "${WORKDIR}/.step-cleanup-done" "cleanup"
 log "stage start: cleanup root=${WORKDIR_ROOT}"
 # mc image has no find(1); this stage owns PVC process-dir pruning.
 LOCAL_KEEP="${LOCAL_RETENTION_DAYS:-7}"

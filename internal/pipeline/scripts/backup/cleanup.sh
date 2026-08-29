@@ -7,6 +7,7 @@ STAGE=cleanup
 DATA_ROOT="${DATA_DIR:-${PGDUMP_DIR:?DATA_DIR or PGDUMP_DIR required}}"
 DATA_DIR="${DATA_ROOT}/${HOSTNAME}"
 pipeline_init
+already_done_hold "${DATA_DIR}/.step-cleanup-done" "cleanup"
 log "stage start: cleanup root=${DATA_ROOT}"
 log "scratch dir=${DATA_DIR}"
 log "clearing step markers under ${DATA_DIR}"

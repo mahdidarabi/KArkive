@@ -7,6 +7,8 @@ DATA_ROOT="${DATA_DIR:-${PGDUMP_DIR:?DATA_DIR or PGDUMP_DIR required}}"
 DATA_DIR="${DATA_ROOT}/${HOSTNAME}"
 pipeline_init
 wait_for "${DATA_DIR}/.step-cleanup-done" "cleanup"
+already_done_hold "${DATA_DIR}/.step-dump-done" "dump"
+clear_step_failed
 log "stage start: dump database=${PGDATABASE} host=${PGHOST}:${PGPORT}"
 log "scratch dir=${DATA_DIR}"
 OUT="${DATA_DIR}/pg_dump-${PGDATABASE}-$(date '+%Y-%m-%d-%H-%M').pgdump"

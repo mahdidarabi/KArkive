@@ -7,6 +7,8 @@ DATA_ROOT="${DATA_DIR:-${PGDUMP_DIR:?DATA_DIR or PGDUMP_DIR required}}"
 DATA_DIR="${DATA_ROOT}/${HOSTNAME}"
 pipeline_init
 wait_for "${DATA_DIR}/.step-cleanup-done" "cleanup"
+already_done_hold "${DATA_DIR}/.step-dump-done" "dump"
+clear_step_failed
 NAME="${REDIS_NAME:-${MYSQL_DATABASE:-${PGDATABASE:-}}}"
 HOST="${REDIS_HOST:-}"
 PORT="${REDIS_PORT:-6379}"

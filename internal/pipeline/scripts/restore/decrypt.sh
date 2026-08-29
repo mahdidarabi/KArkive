@@ -7,6 +7,7 @@ WORKDIR_ROOT="${WORKDIR}"
 WORKDIR="${WORKDIR_ROOT}/${HOSTNAME}"
 pipeline_init
 wait_for "${WORKDIR}/.step-fetch-done" "fetch"
+already_done_hold "${WORKDIR}/.step-decrypt-done" "decrypt"
 log "stage start: decrypt"
 test -s "${WORKDIR}/dump.gz.gpg"
 export GNUPGHOME="/tmp/gpg-home"

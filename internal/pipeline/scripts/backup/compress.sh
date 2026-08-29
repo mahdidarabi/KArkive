@@ -7,6 +7,7 @@ DATA_ROOT="${DATA_DIR:-${PGDUMP_DIR:?DATA_DIR or PGDUMP_DIR required}}"
 DATA_DIR="${DATA_ROOT}/${HOSTNAME}"
 pipeline_init
 wait_for "${DATA_DIR}/.step-dump-done" "dump"
+already_done_hold "${DATA_DIR}/.step-compress-done" "compress"
 log "stage start: compress"
 DUMP_PREFIX="${DUMP_PREFIX:-pg_dump}"
 case "${DUMP_PREFIX}" in
