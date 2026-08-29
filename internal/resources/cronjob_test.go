@@ -40,15 +40,15 @@ func TestMutateBackupConfigMap_Postgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]string{
-		"ENGINE":      "postgres",
-		"DUMP_PREFIX": "pg_dump",
-		"PGHOST":      "postgres.example.svc.cluster.local",
-		"PGPORT":      "5432",
-		"PGDATABASE":  "app",
-		"S3_PATH":     "app/pgdump",
-		"S3_ENDPOINT": "https://s3.example.com",
-		"S3_BUCKET":   "backups",
-		"S3_ENABLED":  "true",
+		"ENGINE":           "postgres",
+		"DUMP_PREFIX":      "pg_dump",
+		"PGHOST":           "postgres.example.svc.cluster.local",
+		"PGPORT":           "5432",
+		"PGDATABASE":       "app",
+		"S3_PATH":          "app/pgdump",
+		"S3_ENDPOINT":      "https://s3.example.com",
+		"S3_BUCKET":        "backups",
+		"S3_ENABLED":       "true",
 		"LOG_FILE_ENABLED": "false",
 	}
 	for k, v := range want {

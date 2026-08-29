@@ -214,6 +214,11 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              logFileEnabled:
+                description: |-
+                  LogFileEnabled writes stage logs to logs/<pod>.log on the volume as well
+                  as stderr. Default false. Files older than LocalRetentionDays are pruned.
+                type: boolean
               mcConfigDir:
                 description: McConfigDir for the minio client. Default /tmp/mc-config.
                 type: string
@@ -586,11 +591,6 @@ spec:
                     minimum: 1
                     type: integer
                 type: object
-              logFileEnabled:
-                description: |-
-                  LogFileEnabled writes stage logs to logs/<pod>.log on the volume as well
-                  as stderr. Default false. Files older than LocalRetentionDays are pruned.
-                type: boolean
               schedule:
                 description: Schedule is a standard Cron expression (required).
                 minLength: 1
