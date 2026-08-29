@@ -24,8 +24,21 @@ log "stage start: dump instance=${NAME} host=${HOST}:${PORT}"
 log "scratch dir=${DATA_DIR}"
 OUT="${DATA_DIR}/redisdump-${NAME}-$(date '+%Y-%m-%d-%H-%M').rdb"
 log "running redis-cli --rdb -> ${OUT}"
+err="${DATA_DIR}/.redisdump.stderr"
+dump_heartbeat_start "${OUT}"
+set +e
 # shellcheck disable=SC2086
-redis-cli -h "${HOST}" -p "${PORT}" ${USER_ARGS} --rdb "${OUT}"
+redis-cli -h "${HOST}" -p "${PORT}" ${USER_ARGS} --rdb "${OUT}" 2>"${err}"
+ec=$?
+set -e
+dump_heartbeat_stop
+log_file_lines "redis-cli: " "${err}"
+rm -f "${err}"
+if [ "$ec" -ne 0 ]; then
+  log "ERROR: redis-cli --rdb failed exit=${ec}" >&2
+  mark_failed
+  exit "$ec"
+fi
 log "redis-cli --rdb finished size=$(wc -c < "${OUT}") bytes"
 log "source INFO keyspace / memory"
 # shellcheck disable=SC2086

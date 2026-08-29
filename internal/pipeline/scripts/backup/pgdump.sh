@@ -11,10 +11,26 @@ already_done_hold "${DATA_DIR}/.step-dump-done" "dump"
 clear_step_failed
 log "stage start: dump database=${PGDATABASE} host=${PGHOST}:${PGPORT}"
 log "scratch dir=${DATA_DIR}"
+# Cluster GUCs (often 180s) cancel a long pg_dump; 0 = no limit for this session.
+export PGOPTIONS="${PGOPTIONS:+${PGOPTIONS} }-c statement_timeout=0 -c lock_timeout=0"
+log "PGOPTIONS=${PGOPTIONS}"
 OUT="${DATA_DIR}/pg_dump-${PGDATABASE}-$(date '+%Y-%m-%d-%H-%M').pgdump"
 log "running pg_dump -> ${OUT}"
+err="${DATA_DIR}/.pg_dump.stderr"
+dump_heartbeat_start "${OUT}"
+set +e
 pg_dump --clean --if-exists --load-via-partition-root --quote-all-identifiers \
-  --no-password --format=plain --file="${OUT}"
+  --no-password --format=plain --file="${OUT}" 2>"${err}"
+ec=$?
+set -e
+dump_heartbeat_stop
+log_file_lines "pg_dump: " "${err}"
+rm -f "${err}"
+if [ "$ec" -ne 0 ]; then
+  log "ERROR: pg_dump failed exit=${ec}" >&2
+  mark_failed
+  exit "$ec"
+fi
 # PG18+ pg_dump may emit SETs (e.g. transaction_timeout) rejected by older majors.
 sed -i -E '/^SET[[:space:]]+transaction_timeout[[:space:]]*=/d' "${OUT}"
 log "pg_dump finished size=$(wc -c < "${OUT}") bytes"

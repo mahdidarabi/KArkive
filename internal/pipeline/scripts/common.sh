@@ -95,6 +95,46 @@ clear_step_failed() {
   fi
 }
 
+# Copy a file into the pipeline log (tool stderr). Empty files are skipped.
+log_file_lines() {
+  prefix="$1"
+  file="$2"
+  [ -f "$file" ] && [ -s "$file" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -n "$line" ] || continue
+    log "${prefix}${line}"
+  done < "$file"
+}
+
+# Background size/time lines while dump writes $1. Call dump_heartbeat_stop after.
+dump_heartbeat_start() {
+  out="$1"
+  touch "${STEP_DIR}/.dump-running"
+  (
+    i=0
+    while [ -f "${STEP_DIR}/.dump-running" ]; do
+      sleep 30
+      [ -f "${STEP_DIR}/.dump-running" ] || break
+      i=$((i + 30))
+      sz=0
+      if [ -f "$out" ]; then
+        sz=$(wc -c < "$out") || sz=0
+      fi
+      log "still dumping (~${i}s) size=${sz} bytes"
+    done
+  ) &
+  DUMP_HB_PID=$!
+}
+
+dump_heartbeat_stop() {
+  rm -f "${STEP_DIR}/.dump-running"
+  if [ -n "${DUMP_HB_PID:-}" ]; then
+    kill "${DUMP_HB_PID}" 2>/dev/null || true
+    wait "${DUMP_HB_PID}" 2>/dev/null || true
+    DUMP_HB_PID=""
+  fi
+}
+
 wait_for() {
   marker="$1"
   prev="$2"

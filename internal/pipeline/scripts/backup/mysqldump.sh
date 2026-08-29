@@ -21,6 +21,9 @@ log "stage start: dump database=${DB} host=${HOST}:${PORT}"
 log "scratch dir=${DATA_DIR}"
 OUT="${DATA_DIR}/mysqldump-${DB}-$(date '+%Y-%m-%d-%H-%M').sql"
 log "running mysqldump -> ${OUT}"
+err="${DATA_DIR}/.mysqldump.stderr"
+dump_heartbeat_start "${OUT}"
+set +e
 mysqldump \
   --host="${HOST}" \
   --port="${PORT}" \
@@ -31,8 +34,19 @@ mysqldump \
   --events \
   --hex-blob \
   --default-character-set=utf8mb4 \
+  --max-statement-time=0 \
   --databases "${DB}" \
-  > "${OUT}"
+  > "${OUT}" 2>"${err}"
+ec=$?
+set -e
+dump_heartbeat_stop
+log_file_lines "mysqldump: " "${err}"
+rm -f "${err}"
+if [ "$ec" -ne 0 ]; then
+  log "ERROR: mysqldump failed exit=${ec}" >&2
+  mark_failed
+  exit "$ec"
+fi
 log "mysqldump finished size=$(wc -c < "${OUT}") bytes"
 log "database size summary"
 mariadb --host="${HOST}" --port="${PORT}" --user="${USER}" -N -e "

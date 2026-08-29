@@ -10,7 +10,7 @@ func TestCommonScriptEmbedded(t *testing.T) {
 	if s == "" {
 		t.Fatal("common.sh is empty")
 	}
-	for _, fn := range []string{"log()", "wait_for()", "hold_until_job_done()", "mark_failed()", "pipeline_init()", "log_file_enabled()", "prune_pipeline_logs()", "already_done_hold()", "already_done_exit()", "clear_step_failed()"} {
+	for _, fn := range []string{"log()", "wait_for()", "hold_until_job_done()", "mark_failed()", "pipeline_init()", "log_file_enabled()", "prune_pipeline_logs()", "already_done_hold()", "already_done_exit()", "clear_step_failed()", "log_file_lines()", "dump_heartbeat_start()", "dump_heartbeat_stop()"} {
 		if !strings.Contains(s, fn) {
 			t.Errorf("common.sh missing %s", fn)
 		}
@@ -63,7 +63,7 @@ func TestMariaDBDumpRestoreFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"--hex-blob", "--default-character-set=utf8mb4", "--databases"} {
+	for _, want := range []string{"--hex-blob", "--default-character-set=utf8mb4", "--databases", "--max-statement-time=0"} {
 		if !strings.Contains(dump, want) {
 			t.Errorf("mysqldump.sh missing %q", want)
 		}
@@ -125,5 +125,18 @@ func TestEncryptHonorsS3Enabled(t *testing.T) {
 	}
 	if !strings.Contains(s, ".step-job-done") {
 		t.Fatal("encrypt.sh should write .step-job-done when S3 is disabled")
+	}
+}
+
+func TestPgDumpDisablesStatementTimeout(t *testing.T) {
+	s, err := BackupScript("pgdump.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(s, "statement_timeout=0") {
+		t.Fatal("pgdump.sh should disable statement_timeout for long dumps")
+	}
+	if !strings.Contains(s, "dump_heartbeat_start") {
+		t.Fatal("pgdump.sh should heartbeat while pg_dump runs")
 	}
 }
