@@ -13,7 +13,7 @@
         "defaults": { "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }, "unit": "none" },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
       "id": 1,
       "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "title": "Backups ready",
@@ -33,7 +33,7 @@
         "defaults": { "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }, "unit": "none" },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
       "id": 2,
       "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "title": "Restores ready",
@@ -50,19 +50,59 @@
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
-        "defaults": { "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }, "unit": "none" },
+        "defaults": { "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "yellow", "value": null }, { "color": "green", "value": 1 }] }, "unit": "none" },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-      "id": 3,
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "id": 8,
       "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "title": "Failed last jobs",
+      "title": "Last job succeeded",
       "type": "stat",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum(karkive_backup_last_job_failed{namespace=~\"$namespace\"}) + sum(karkive_restore_last_job_failed{namespace=~\"$namespace\"}) or vector(0)",
+          "expr": "(sum(karkive_backup_last_job_info{namespace=~\"$namespace\",outcome=\"Succeeded\"}) or vector(0)) + (sum(karkive_restore_last_job_info{namespace=~\"$namespace\",outcome=\"Succeeded\"}) or vector(0))",
+          "legendFormat": "succeeded",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }, "unit": "none" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "Last job failed",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "(sum(karkive_backup_last_job_info{namespace=~\"$namespace\",outcome=\"Failed\"}) or vector(0)) + (sum(karkive_restore_last_job_info{namespace=~\"$namespace\",outcome=\"Failed\"}) or vector(0))",
           "legendFormat": "failed",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }] }, "unit": "none" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "id": 9,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "Suspended",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "(sum(karkive_backup_suspended{namespace=~\"$namespace\"}) or vector(0)) + (sum(karkive_restore_suspended{namespace=~\"$namespace\"}) or vector(0))",
+          "legendFormat": "suspended",
           "refId": "A"
         }
       ]
@@ -73,7 +113,7 @@
         "defaults": { "unit": "s" },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
       "id": 4,
       "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "title": "Oldest backup success age",
@@ -96,7 +136,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "id": 5,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
-      "title": "Last Job duration",
+      "title": "Last job duration",
       "type": "timeseries",
       "targets": [
         {
@@ -116,20 +156,26 @@
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 }, "unit": "ops" },
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "spanNulls": false }, "unit": "s" },
         "overrides": []
       },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-      "id": 6,
+      "id": 10,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
-      "title": "Reconcile errors",
+      "title": "Time since last success",
       "type": "timeseries",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum by (controller) (rate(controller_runtime_reconcile_errors_total{controller=~\"backup|restore\", namespace=~\"$namespace\"}[5m]))",
-          "legendFormat": "{{controller}}",
+          "expr": "time() - karkive_backup_last_successful_timestamp_seconds{namespace=~\"$namespace\"}",
+          "legendFormat": "backup {{namespace}}/{{name}}",
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "time() - karkive_restore_last_successful_timestamp_seconds{namespace=~\"$namespace\"}",
+          "legendFormat": "restore {{namespace}}/{{name}}",
+          "refId": "B"
         }
       ]
     },
@@ -148,7 +194,8 @@
                   {
                     "options": {
                       "Failed": { "color": "red", "index": 0, "text": "Failed" },
-                      "Succeeded": { "color": "green", "index": 1, "text": "Succeeded" }
+                      "Succeeded": { "color": "green", "index": 1, "text": "Succeeded" },
+                      "Unknown": { "color": "yellow", "index": 2, "text": "Unknown" }
                     },
                     "type": "value"
                   }
@@ -161,7 +208,7 @@
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
       "id": 7,
       "options": { "cellHeight": "sm", "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
-      "title": "Last Job outcome",
+      "title": "Last job outcome",
       "transformations": [
         { "id": "merge", "options": {} },
         {
@@ -169,14 +216,16 @@
           "options": {
             "excludeByName": { "Time": true, "Value": true, "__name__": true },
             "indexByName": {
-              "namespace": 0,
-              "name": 1,
-              "engine": 2,
-              "outcome": 3,
-              "reason": 4,
-              "job_name": 5
+              "kind": 0,
+              "namespace": 1,
+              "name": 2,
+              "engine": 3,
+              "outcome": 4,
+              "reason": 5,
+              "job_name": 6
             },
             "renameByName": {
+              "kind": "Kind",
               "namespace": "Namespace",
               "name": "Name",
               "engine": "Engine",
@@ -191,7 +240,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "karkive_backup_last_job_info{namespace=~\"$namespace\"}",
+          "expr": "label_replace(karkive_backup_last_job_info{namespace=~\"$namespace\"}, \"kind\", \"Backup\", \"\", \"\")",
           "format": "table",
           "instant": true,
           "legendFormat": "backup",
@@ -199,7 +248,167 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "karkive_restore_last_job_info{namespace=~\"$namespace\"}",
+          "expr": "label_replace(karkive_restore_last_job_info{namespace=~\"$namespace\"}, \"kind\", \"Restore\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "restore",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }, "mappings": [], "unit": "s" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Kind" },
+            "properties": [{ "id": "unit", "value": "string" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Namespace" },
+            "properties": [{ "id": "unit", "value": "string" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Name" },
+            "properties": [{ "id": "unit", "value": "string" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Engine" },
+            "properties": [{ "id": "unit", "value": "string" }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "id": 11,
+      "options": { "cellHeight": "sm", "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
+      "title": "Last success age",
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true },
+            "indexByName": {
+              "kind": 0,
+              "namespace": 1,
+              "name": 2,
+              "engine": 3,
+              "Value": 4
+            },
+            "renameByName": {
+              "kind": "Kind",
+              "namespace": "Namespace",
+              "name": "Name",
+              "engine": "Engine",
+              "Value": "Age"
+            }
+          }
+        }
+      ],
+      "type": "table",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "label_replace(time() - karkive_backup_last_successful_timestamp_seconds{namespace=~\"$namespace\"}, \"kind\", \"Backup\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "backup",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "label_replace(time() - karkive_restore_last_successful_timestamp_seconds{namespace=~\"$namespace\"}, \"kind\", \"Restore\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "restore",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 }, "unit": "ops" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "title": "Reconcile errors",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum by (controller) (rate(controller_runtime_reconcile_errors_total{controller=~\"backup|restore\", namespace=~\"$namespace\"}[5m]))",
+          "legendFormat": "{{controller}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }, "mappings": [], "unit": "s" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Kind" },
+            "properties": [{ "id": "unit", "value": "string" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Namespace" },
+            "properties": [{ "id": "unit", "value": "string" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Name" },
+            "properties": [{ "id": "unit", "value": "string" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Engine" },
+            "properties": [{ "id": "unit", "value": "string" }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "id": 12,
+      "options": { "cellHeight": "sm", "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
+      "title": "Last schedule age",
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true },
+            "indexByName": {
+              "kind": 0,
+              "namespace": 1,
+              "name": 2,
+              "engine": 3,
+              "Value": 4
+            },
+            "renameByName": {
+              "kind": "Kind",
+              "namespace": "Namespace",
+              "name": "Name",
+              "engine": "Engine",
+              "Value": "Age"
+            }
+          }
+        }
+      ],
+      "type": "table",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "label_replace(time() - karkive_backup_last_schedule_timestamp_seconds{namespace=~\"$namespace\"}, \"kind\", \"Backup\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "backup",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "label_replace(time() - karkive_restore_last_schedule_timestamp_seconds{namespace=~\"$namespace\"}, \"kind\", \"Restore\", \"\", \"\")",
           "format": "table",
           "instant": true,
           "legendFormat": "restore",
@@ -229,14 +438,14 @@
         "allValue": ".*",
         "current": { "text": "All", "value": "$__all" },
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(karkive_backup_ready, namespace)",
+        "definition": "label_values({__name__=~\"karkive_(backup|restore)_ready\"}, namespace)",
         "hide": 0,
         "includeAll": true,
         "label": "Namespace",
         "multi": false,
         "name": "namespace",
         "options": [],
-        "query": "label_values(karkive_backup_ready, namespace)",
+        "query": "label_values({__name__=~\"karkive_(backup|restore)_ready\"}, namespace)",
         "refresh": 1,
         "regex": "",
         "sort": 1,
@@ -249,5 +458,5 @@
   "timezone": "browser",
   "title": "KArkive",
   "uid": "karkive",
-  "version": 1
+  "version": 2
 }
