@@ -1,3 +1,6 @@
+crds:
+  install: true
+
 image:
   repository: ghcr.io/mahdidarabi/karkive
   tag: ""

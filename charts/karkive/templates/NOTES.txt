@@ -7,6 +7,9 @@ Install a Backup or Restore CR (`engine`: postgres, mariadb, or redis):
 
 The operator creates a ConfigMap, optional PVC, and CronJob named `karkive-backup-<cr-name>` or `karkive-restore-<cr-name>`.
 Backup and Restore status include the last finished Job outcome (`status.lastJob`).
+{{- if .Values.crds.install }}
+Backup and Restore CRDs are applied with this release (schema updates on upgrade, including spec.logFileEnabled).
+{{- end }}
 
 {{- if .Values.webhook.enabled }}
 Validating webhooks reject invalid Backup/Restore specs (cron, required fields).

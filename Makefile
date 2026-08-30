@@ -40,8 +40,7 @@ manifests: controller-gen generate
 		output:crd:artifacts:config=config/crd/bases \
 		output:rbac:artifacts:config=config/rbac \
 		output:webhook:artifacts:config=config/webhook
-	mkdir -p charts/karkive/crds
-	cp config/crd/bases/*.yaml charts/karkive/crds/
+	python3 hack/embed-chart-crds.py
 
 .PHONY: docker-build
 docker-build:

@@ -1,7 +1,7 @@
 # KArkive
 
 [![CI](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml/badge.svg)](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml)
-[![Helm](https://img.shields.io/badge/Helm-0.0.10--p.1-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
+[![Helm](https://img.shields.io/badge/Helm-0.0.10--p.2-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
 [![Image](https://img.shields.io/badge/GHCR-karkive-blue?logo=github)](https://github.com/mahdidarabi/KArkive/pkgs/container/karkive)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev/)
 [![Kubebuilder](https://img.shields.io/badge/API-karkive.io%2Fv1alpha1-326CE5?logo=kubernetes)](https://github.com/mahdidarabi/KArkive/tree/main/api/v1alpha1)
@@ -77,13 +77,13 @@ Redis restore starts an ephemeral `redis-server` in the Job and has the target `
 
 Images are published to `ghcr.io/mahdidarabi/karkive` from GitHub Actions on `main` (`latest`, `main`, `sha-<git-sha>`) and on tags `v*` (semver). Helm charts are pushed to GHCR on tags `v*`. `Chart.yaml` `version` and `appVersion` must match the tag without the `v` prefix.
 
-Current release: **`0.0.10-p.1`**
+Current release: **`0.0.10-p.2`**
 
 ```bash
-helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.10-p.1
+helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.10-p.2
 
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.10-p.1 \
+  --version 0.0.10-p.2 \
   -n karkive-system --create-namespace
 ```
 
@@ -91,7 +91,7 @@ With Prometheus Operator scrape, alerts, and a Grafana dashboard ConfigMap:
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.10-p.1 \
+  --version 0.0.10-p.2 \
   -n karkive-system --create-namespace \
   --set metrics.serviceMonitor.enabled=true \
   --set metrics.prometheusRule.enabled=true \
@@ -102,12 +102,14 @@ On GitOps (Argo CD), prefer cert-manager for webhook serving certs so Helm does 
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.10-p.1 \
+  --version 0.0.10-p.2 \
   -n karkive-system --create-namespace \
   --set webhook.certManager.enabled=true
 ```
 
 cert-manager must already be installed. If you previously used the Helm-generated Secret, delete it once so cert-manager can create it.
+
+The chart applies Backup and Restore CRDs (`crds.install`, default true) so `helm upgrade` updates the schema. Uninstall keeps the CRDs.
 
 ### Upgrade from 0.0.3
 
@@ -356,7 +358,7 @@ kubectl apply -f config/samples/karkive_v1alpha1_backup.yaml
 | Target | What it does |
 | --- | --- |
 | `make generate` | Deepcopy for `api/` |
-| `make manifests` | CRDs, RBAC, webhook manifests; copies CRDs into the Helm chart |
+| `make manifests` | CRDs, RBAC, webhook manifests |
 | `make test` | `go test ./...` |
 | `make docker-build` | Operator image (`IMG`, default `ghcr.io/mahdidarabi/karkive:dev`) |
 | `make install` / `uninstall` | Apply / delete CRDs |

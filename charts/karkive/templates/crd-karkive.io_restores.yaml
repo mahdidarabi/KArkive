@@ -1,20 +1,22 @@
+{{- if .Values.crds.install }}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.3
-  name: backups.karkive.io
+    helm.sh/resource-policy: keep
+  name: restores.karkive.io
 spec:
   group: karkive.io
   names:
-    kind: Backup
-    listKind: BackupList
-    plural: backups
+    kind: Restore
+    listKind: RestoreList
+    plural: restores
     shortNames:
-    - kbackup
-    - bak
-    singular: backup
+    - krestore
+    - res
+    singular: restore
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -27,12 +29,9 @@ spec:
     - jsonPath: .status.phase
       name: Phase
       type: string
-    - jsonPath: .status.conditions[?(@.type=='BackupSucceeded')].status
+    - jsonPath: .status.conditions[?(@.type=='RestoreSucceeded')].status
       name: Succeeded
       type: string
-    - jsonPath: .status.lastSuccessfulTime
-      name: Last Success
-      type: date
     - jsonPath: .status.lastJob.outcome
       name: Last Job
       type: string
@@ -42,8 +41,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Backup describes a scheduled logical backup pipeline (dump →
-          gzip → gpg → optional S3).
+        description: Restore describes a scheduled logical restore pipeline (S3 →
+          decrypt → extract → restore).
         properties:
           apiVersion:
             description: |-
@@ -63,17 +62,19 @@ spec:
           metadata:
             type: object
           spec:
-            description: BackupSpec defines the desired state of Backup.
+            description: RestoreSpec defines the desired state of Restore.
             properties:
+              backupFile:
+                description: |-
+                  BackupFile is a specific S3 object name. Empty + UseLatestBackupAsFallback
+                  downloads the newest dump matching the engine prefix.
+                type: string
               component:
                 description: Component is the app.kubernetes.io/component label. Defaults
                   to metadata.name.
                 type: string
-              dataDir:
-                description: DataDir is the volume mount path. Default /backup/data.
-                type: string
               database:
-                description: Database connection (non-secret fields).
+                description: Database is the restore target (sandbox cluster).
                 properties:
                   host:
                     description: Host is the DNS name or IP of the database (required).
@@ -99,9 +100,13 @@ spec:
                 - host
                 - name
                 type: object
+              dropDatabaseIfExists:
+                description: DropDatabaseIfExists drops a non-empty target before
+                  restore. Default true.
+                type: boolean
               engine:
                 default: postgres
-                description: Engine of the source datastore.
+                description: Engine of the restore target.
                 enum:
                 - postgres
                 - mariadb
@@ -209,23 +214,35 @@ spec:
                     format: int32
                     type: integer
                 type: object
-              localRetentionDays:
-                description: LocalRetentionDays for retained/ encrypted dumps on the
-                  PVC. Default 7.
-                format: int32
-                minimum: 1
-                type: integer
               logFileEnabled:
                 description: |-
                   LogFileEnabled writes stage logs to logs/<pod>.log on the volume as well
-                  as stderr. Default false. Files older than LocalRetentionDays are pruned.
+                  as stderr. Default false. Files older than 7 days are pruned.
                 type: boolean
+              mariadbSecret:
+                description: MariaDBSecret is the target MariaDB Secret (MYSQL_USER
+                  / MYSQL_PASSWORD).
+                properties:
+                  name:
+                    description: Name of the Secret in the same namespace.
+                    minLength: 1
+                    type: string
+                  passwordKey:
+                    description: PasswordKey in the Secret. Default "password" (postgres)
+                      or engine-specific.
+                    type: string
+                  usernameKey:
+                    description: UsernameKey in the Secret. Default "username".
+                    type: string
+                required:
+                - name
+                type: object
               mcConfigDir:
                 description: McConfigDir for the minio client. Default /tmp/mc-config.
                 type: string
               persistence:
-                description: 'Persistence for dump scratch + retained/. Default: PVC
-                  enabled, 1Gi.'
+                description: Persistence for the restore workdir. Set enabled=false
+                  for lite (emptyDir) restores.
                 properties:
                   accessModes:
                     description: AccessModes of the PVC. Default [ReadWriteOnce].
@@ -253,6 +270,41 @@ spec:
                     description: StorageClassName of the PVC. Empty uses the cluster
                       default.
                     type: string
+                type: object
+              postgresSecret:
+                description: PostgresSecret is the sandbox Cluster Secret (PGUSER/PGPASSWORD).
+                properties:
+                  name:
+                    description: Name of the Secret in the same namespace.
+                    minLength: 1
+                    type: string
+                  passwordKey:
+                    description: PasswordKey in the Secret. Default "password" (postgres)
+                      or engine-specific.
+                    type: string
+                  usernameKey:
+                    description: UsernameKey in the Secret. Default "username".
+                    type: string
+                required:
+                - name
+                type: object
+              redisSecret:
+                description: RedisSecret is the target Redis Secret (username optional
+                  ACL, password).
+                properties:
+                  name:
+                    description: Name of the Secret in the same namespace.
+                    minLength: 1
+                    type: string
+                  passwordKey:
+                    description: PasswordKey in the Secret. Default "password" (postgres)
+                      or engine-specific.
+                    type: string
+                  usernameKey:
+                    description: UsernameKey in the Secret. Default "username".
+                    type: string
+                required:
+                - name
                 type: object
               resources:
                 description: Resources overrides per-stage resource requests/limits.
@@ -317,7 +369,7 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
-                  compress:
+                  decrypt:
                     description: ResourceRequirements describes the compute resource
                       requirements.
                     properties:
@@ -377,7 +429,7 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
-                  dump:
+                  extract:
                     description: ResourceRequirements describes the compute resource
                       requirements.
                     properties:
@@ -437,7 +489,7 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
-                  encrypt:
+                  fetch:
                     description: ResourceRequirements describes the compute resource
                       requirements.
                     properties:
@@ -497,7 +549,7 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
-                  s3Sync:
+                  restore:
                     description: ResourceRequirements describes the compute resource
                       requirements.
                     properties:
@@ -559,9 +611,7 @@ spec:
                     type: object
                 type: object
               s3:
-                description: |-
-                  S3 destination for encrypted dumps. Set enabled=false to keep dumps only
-                  in retained/ on the PVC (no s3-sync; S3 keys and endpoint/bucket not required).
+                description: S3 source of encrypted dumps.
                 properties:
                   bucket:
                     description: |-
@@ -598,8 +648,8 @@ spec:
                 type: string
               secretRef:
                 description: |-
-                  SecretRef is a Secret in the same namespace with keys:
-                  username, password, gpg_passphrase, and (when s3.enabled) s3_access_key, s3_secret_key.
+                  SecretRef holds s3_access_key, s3_secret_key, gpg_passphrase.
+                  Target DB credentials come from postgresSecret / mariadbSecret / redisSecret.
                 properties:
                   name:
                     default: ""
@@ -612,11 +662,22 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              suspend:
-                description: |-
-                  Suspend stops scheduled runs. The CronJob remains for
-                  `kubectl create job --from=cronjob/karkive-backup-<name>`.
+              stripPgAuditExtension:
+                description: StripPgAuditExtension removes pgAudit DDL from dumps.
+                  Default true.
                 type: boolean
+              suspend:
+                description: Suspend stops scheduled runs. The CronJob remains for
+                  manual Jobs.
+                type: boolean
+              useLatestBackupAsFallback:
+                description: |-
+                  UseLatestBackupAsFallback picks the newest object when BackupFile is empty
+                  or missing. Default true.
+                type: boolean
+              workdir:
+                description: Workdir is the volume mount path. Default /workdir.
+                type: string
             required:
             - database
             - s3
@@ -624,12 +685,12 @@ spec:
             - secretRef
             type: object
           status:
-            description: BackupStatus defines the observed state of Backup.
+            description: RestoreStatus defines the observed state of Restore.
             properties:
               conditions:
                 description: |-
-                  Conditions of the Backup. Ready is admission/sync of owned resources.
-                  BackupSucceeded is the last finished Job (Unknown until one exists).
+                  Conditions of the Restore. Ready is admission/sync of owned resources.
+                  RestoreSucceeded is the last finished Job (Unknown until one exists).
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -689,7 +750,6 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               cronJobName:
-                description: CronJobName is the owned CronJob.
                 type: string
               lastJob:
                 description: LastJob is the most recently finished Job, including
@@ -719,22 +779,18 @@ spec:
                     type: string
                 type: object
               lastScheduleTime:
-                description: LastScheduleTime copied from the CronJob.
                 format: date-time
                 type: string
               lastSuccessfulTime:
-                description: LastSuccessfulTime copied from the CronJob.
                 format: date-time
                 type: string
               observedGeneration:
-                description: ObservedGeneration is the spec generation last processed
-                  by the controller.
                 format: int64
                 type: integer
               phase:
                 description: |-
                   Phase is admission of owned resources: Pending, Ready, Error, Unsupported.
-                  It is not the last Job outcome; see BackupSucceeded.
+                  It is not the last Job outcome; see RestoreSucceeded.
                 type: string
             type: object
         type: object
@@ -742,3 +798,4 @@ spec:
     storage: true
     subresources:
       status: {}
+{{- end }}
