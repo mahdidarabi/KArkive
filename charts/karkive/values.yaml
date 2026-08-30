@@ -74,9 +74,10 @@ metrics:
   prometheusRule:
     enabled: false
     labels: {}
-    # No successful backup within this many seconds (non-suspended CRs).
+    # Dashboard orange: oldest success older than this (default 8h).
+    backupAgingSeconds: 28800
+    # Dashboard red: no success within this many seconds (default 36h).
     backupStaleSeconds: 129600
-    # kube-state-metrics: next_schedule_time this far in the past.
     missedScheduleGraceSeconds: 1800
   grafanaDashboard:
     enabled: false

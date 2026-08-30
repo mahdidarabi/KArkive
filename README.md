@@ -1,7 +1,7 @@
 # KArkive
 
 [![CI](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml/badge.svg)](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml)
-[![Helm](https://img.shields.io/badge/Helm-0.0.10--p.3-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
+[![Helm](https://img.shields.io/badge/Helm-0.0.10--p.4-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
 [![Image](https://img.shields.io/badge/GHCR-karkive-blue?logo=github)](https://github.com/mahdidarabi/KArkive/pkgs/container/karkive)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev/)
 [![Kubebuilder](https://img.shields.io/badge/API-karkive.io%2Fv1alpha1-326CE5?logo=kubernetes)](https://github.com/mahdidarabi/KArkive/tree/main/api/v1alpha1)
@@ -77,13 +77,13 @@ Redis restore starts an ephemeral `redis-server` in the Job and has the target `
 
 Images are published to `ghcr.io/mahdidarabi/karkive` from GitHub Actions on `main` (`latest`, `main`, `sha-<git-sha>`) and on tags `v*` (semver). Helm charts are pushed to GHCR on tags `v*`. `Chart.yaml` `version` and `appVersion` must match the tag without the `v` prefix.
 
-Current release: **`0.0.10-p.3`**
+Current release: **`0.0.10-p.4`**
 
 ```bash
-helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.10-p.3
+helm show chart oci://ghcr.io/mahdidarabi/charts/karkive --version 0.0.10-p.4
 
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.10-p.3 \
+  --version 0.0.10-p.4 \
   -n karkive-system --create-namespace
 ```
 
@@ -91,7 +91,7 @@ With Prometheus Operator scrape, alerts, and a Grafana dashboard ConfigMap:
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.10-p.3 \
+  --version 0.0.10-p.4 \
   -n karkive-system --create-namespace \
   --set metrics.serviceMonitor.enabled=true \
   --set metrics.prometheusRule.enabled=true \
@@ -102,7 +102,7 @@ On GitOps (Argo CD), prefer cert-manager for webhook serving certs so Helm does 
 
 ```bash
 helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
-  --version 0.0.10-p.3 \
+  --version 0.0.10-p.4 \
   -n karkive-system --create-namespace \
   --set webhook.certManager.enabled=true
 ```
@@ -314,7 +314,9 @@ Alerts (when `metrics.prometheusRule.enabled=true`):
 
 - CR not Ready for 15m
 - Last Job failed
+- Backup last success older than `backupAgingSeconds` (default 8h) and not yet stale
 - No successful backup within `backupStaleSeconds` (default 36h) on non-suspended Backups
+- CronJob has scheduled but no Job has finished
 - Missed CronJob schedule via kube-state-metrics (`karkive-backup-*` / `karkive-restore-*`)
 
 ## Webhooks

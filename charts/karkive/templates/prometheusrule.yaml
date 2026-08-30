@@ -46,6 +46,17 @@ spec:
           annotations:
             summary: Last restore Job failed for {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}}
             description: Job {{`{{ $labels.job_name }}`}} failed (reason={{`{{ $labels.reason }}`}}, engine={{`{{ $labels.engine }}`}}).
+        - alert: KArkiveBackupAging
+          expr: |-
+            karkive_backup_suspended == 0
+            and (time() - karkive_backup_last_successful_timestamp_seconds) > {{ .Values.metrics.prometheusRule.backupAgingSeconds }}
+            and (time() - karkive_backup_last_successful_timestamp_seconds) <= {{ .Values.metrics.prometheusRule.backupStaleSeconds }}
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Backup {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} success is older than {{ .Values.metrics.prometheusRule.backupAgingSeconds }}s
+            description: Last success is between {{ .Values.metrics.prometheusRule.backupAgingSeconds }}s and {{ .Values.metrics.prometheusRule.backupStaleSeconds }}s ago (engine={{`{{ $labels.engine }}`}}).
         - alert: KArkiveBackupStale
           expr: |-
             karkive_backup_suspended == 0
@@ -56,6 +67,26 @@ spec:
           annotations:
             summary: Backup {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} has not succeeded recently
             description: No successful backup within {{ .Values.metrics.prometheusRule.backupStaleSeconds }}s.
+        - alert: KArkiveBackupNoFinishedJob
+          expr: |-
+            karkive_backup_last_schedule_timestamp_seconds
+            unless on(namespace, name, engine) karkive_backup_last_job_info
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Backup {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} has been scheduled but no Job has finished
+            description: CronJob has a last schedule and karkive_backup_last_job_info is absent (engine={{`{{ $labels.engine }}`}}).
+        - alert: KArkiveRestoreNoFinishedJob
+          expr: |-
+            karkive_restore_last_schedule_timestamp_seconds
+            unless on(namespace, name, engine) karkive_restore_last_job_info
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Restore {{`{{ $labels.namespace }}`}}/{{`{{ $labels.name }}`}} has been scheduled but no Job has finished
+            description: CronJob has a last schedule and karkive_restore_last_job_info is absent (engine={{`{{ $labels.engine }}`}}).
         - alert: KArkiveCronJobMissedSchedule
           expr: |-
             kube_cronjob_spec_suspend == 0
