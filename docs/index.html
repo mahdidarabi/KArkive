@@ -9,7 +9,14 @@
       content="KArkive is a Kubernetes operator for scheduled logical backups and restores. Declare a Backup or Restore CR; it dumps, gzip-compresses, GPG-encrypts, and syncs to S3. PostgreSQL, MariaDB, Redis."
     />
     <link rel="canonical" href="https://karkive.ir/" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      document.head.prepend(
+        Object.assign(document.createElement("base"), {
+          href: /\.github\.io$/i.test(location.hostname) ? "/karkive/" : "/",
+        })
+      );
+    </script>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <meta name="theme-color" content="#08090c" />
     <meta name="color-scheme" content="dark" />
     <meta property="og:type" content="website" />
@@ -26,7 +33,7 @@
       name="twitter:description"
       content="Scheduled logical backups and restores, declared as Kubernetes CRs."
     />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="styles.css" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -287,6 +294,6 @@
       <p class="legal">&copy; <span id="year"></span> KArkive</p>
     </footer>
 
-    <script src="/app.js" defer></script>
+    <script src="app.js" defer></script>
   </body>
 </html>
