@@ -322,6 +322,44 @@ h3 {
   letter-spacing: 0.04em;
 }
 
+.capability-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 40rem;
+  margin: 2.1rem 0 0;
+  padding: 0.9rem 0;
+  border-block: 1px solid var(--line);
+  list-style: none;
+}
+
+.capability-strip li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0 1rem;
+  border-left: 1px solid var(--line);
+}
+
+.capability-strip li:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.capability-strip strong {
+  color: var(--paper);
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.capability-strip span {
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 0.67rem;
+  line-height: 1.25;
+}
+
 .section-head {
   max-width: 40rem;
   margin-bottom: 2rem;
@@ -920,8 +958,25 @@ pre .s {
 }
 
 @media (max-width: 640px) {
-  .nav nav a:not(.gh) {
+  .nav {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .nav nav {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+    scrollbar-width: none;
+  }
+
+  .nav nav::-webkit-scrollbar {
     display: none;
+  }
+
+  .nav nav a {
+    flex: 0 0 auto;
   }
 
   h1 {
@@ -945,6 +1000,16 @@ pre .s {
   .job-row > :nth-child(4),
   .job-row > :nth-child(5) {
     display: none;
+  }
+
+  .capability-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem 0;
+  }
+
+  .capability-strip li:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
   }
 }
 
