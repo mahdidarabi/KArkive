@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KArkive — Kubernetes operator for logical backups</title>
+    <meta
+      name="description"
+      content="KArkive is a Kubernetes operator for scheduled logical backups and restores. Declare a Backup or Restore CR; it dumps, gzip-compresses, GPG-encrypts, and syncs to S3. PostgreSQL, MariaDB, Redis."
+    />
+    <link rel="canonical" href="https://karkive.ir/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#08090c" />
+    <meta name="color-scheme" content="dark" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://karkive.ir/" />
+    <meta property="og:title" content="KArkive — Kubernetes operator for logical backups" />
+    <meta
+      property="og:description"
+      content="Declare a Backup or Restore CR. KArkive dumps, gzip-compresses, GPG-encrypts, and syncs to S3. PostgreSQL, MariaDB, Redis."
+    />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="KArkive — Kubernetes operator for logical backups" />
+    <meta
+      name="twitter:description"
+      content="Scheduled logical backups and restores, declared as Kubernetes CRs."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "KArkive",
+        "url": "https://karkive.ir",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Kubernetes",
+        "license": "https://github.com/mahdidarabi/KArkive",
+        "description": "Kubernetes operator for scheduled logical backups and restores of PostgreSQL, MariaDB, and Redis.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="nav">
+      <a class="brand" href="#top" aria-label="KArkive home">
+        <svg class="mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <path d="M32 8.5 54 21.2v25.6L32 59.5 10 46.8V21.2L32 8.5Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+          <rect x="20" y="24" width="24" height="5.5" rx="1.2" fill="currentColor"/>
+          <rect x="22.5" y="32.2" width="19" height="5.5" rx="1.2" fill="currentColor" opacity=".72"/>
+          <rect x="25" y="40.4" width="14" height="5.5" rx="1.2" fill="currentColor" opacity=".44"/>
+        </svg>
+        <span>KArkive</span>
+      </a>
+      <nav aria-label="Primary">
+        <a href="#how">How it works</a>
+        <a href="#engines">Engines</a>
+        <a href="#install">Install</a>
+        <a class="gh" href="https://github.com/mahdidarabi/KArkive">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <p class="eyebrow">Kubernetes operator · <code>karkive.io/v1alpha1</code></p>
+        <h1>You declare a <em>Backup</em>.<br />KArkive runs the archive.</h1>
+        <p class="lede">
+          Scheduled logical backups and restores, in-cluster. A CR becomes a ConfigMap,
+          optional PVC, and CronJob that dump, gzip, GPG-encrypt, and sync to S3 — and
+          the reverse on restore.
+        </p>
+        <div class="cta">
+          <a class="btn btn-primary" href="#install">Install with Helm</a>
+          <a class="btn btn-ghost" href="https://github.com/mahdidarabi/KArkive">View the source</a>
+        </div>
+        <div class="code-wrap hero-term">
+          <div class="code-bar">
+            <span>install</span>
+            <button type="button" class="copy" data-copy="#helm-install" aria-label="Copy Helm install">Copy</button>
+          </div>
+          <pre tabindex="0"><code>helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
+  --version 0.0.10-p.5 \
+  -n karkive-system --create-namespace</code></pre>
+        </div>
+        <ul class="engines-row" aria-label="Supported engines">
+          <li>PostgreSQL</li>
+          <li>MariaDB</li>
+          <li>Redis</li>
+        </ul>
+      </section>
+
+      <section class="panel pipeline" id="how">
+        <div class="section-head">
+          <p class="eyebrow">How it works</p>
+          <h2>A CR. Owned jobs. A pipeline you can read.</h2>
+          <p>
+            The operator never shells out from the controller. It admits resources, then
+            a Job runs the stages — one container each, in order.
+          </p>
+        </div>
+
+        <div class="flow">
+          <ol class="flow-main">
+            <li>
+              <span class="flow-k">CR</span>
+              <span>Backup / Restore</span>
+            </li>
+            <li>
+              <span class="flow-k">Op</span>
+              <span>KArkive reconciles</span>
+            </li>
+            <li>
+              <span class="flow-k">Own</span>
+              <span>ConfigMap · PVC · CronJob</span>
+            </li>
+            <li>
+              <span class="flow-k">Job</span>
+              <span>Pipeline pod</span>
+            </li>
+          </ol>
+        </div>
+
+        <div class="stages">
+          <article>
+            <h3>Backup</h3>
+            <ol>
+              <li>cleanup</li>
+              <li>dump</li>
+              <li>compress</li>
+              <li>encrypt</li>
+              <li>s3-sync</li>
+            </ol>
+            <p>Skip <code>s3-sync</code> when <code>spec.s3.enabled</code> is false; encrypted dumps stay on the PVC.</p>
+          </article>
+          <article>
+            <h3>Restore</h3>
+            <ol>
+              <li>cleanup</li>
+              <li>fetch</li>
+              <li>decrypt</li>
+              <li>extract</li>
+              <li>restore</li>
+            </ol>
+            <p>Target credentials come from an engine secret, not from the S3/GPG <code>secretRef</code>.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="declare" id="declare">
+        <div class="declare-copy">
+          <p class="eyebrow">API</p>
+          <h2>Write YAML you already know.</h2>
+          <p>
+            <code>Backup</code> and <code>Restore</code> are namespaced CRs. Short names:
+            <code>kbackup</code> / <code>bak</code>, <code>krestore</code> / <code>res</code>.
+          </p>
+          <ul class="facts">
+            <li>
+              <strong>Secrets stay yours.</strong>
+              The operator never creates or mutates them. It only reads
+              <code>spec.secretRef</code> (and the engine restore secret) in the CR namespace.
+            </li>
+            <li>
+              <strong>Names are kind-prefixed.</strong>
+              Owned objects are <code>karkive-backup-&lt;name&gt;</code> and
+              <code>karkive-restore-&lt;name&gt;</code>, so both CRs can share a name.
+            </li>
+            <li>
+              <strong>Ready is not last-job.</strong>
+              <code>status.phase</code> is admission of owned resources.
+              Last Job outcome is <code>BackupSucceeded</code> / <code>RestoreSucceeded</code>.
+            </li>
+          </ul>
+        </div>
+        <div class="code-wrap">
+          <div class="code-bar">
+            <span>backup.yaml</span>
+            <button type="button" class="copy" data-copy="#backup-yaml" aria-label="Copy Backup example">Copy</button>
+          </div>
+          <pre id="backup-yaml" tabindex="0"><code><span class="k">apiVersion</span>: karkive.io/v1alpha1
+<span class="k">kind</span>: Backup
+<span class="k">metadata</span>:
+  <span class="k">name</span>: app-postgres
+<span class="k">spec</span>:
+  <span class="k">engine</span>: postgres
+  <span class="k">schedule</span>: <span class="s">"0 2 * * *"</span>
+  <span class="k">database</span>:
+    <span class="k">host</span>: postgres.example.svc
+    <span class="k">name</span>: app
+  <span class="k">s3</span>:
+    <span class="k">endpoint</span>: https://s3.example.com
+    <span class="k">bucket</span>: backups
+    <span class="k">path</span>: app/pgdump
+  <span class="k">secretRef</span>:
+    <span class="k">name</span>: backup-app-postgres</code></pre>
+        </div>
+      </section>
+
+      <section class="engines" id="engines">
+        <div class="section-head">
+          <p class="eyebrow">Engines</p>
+          <h2>Three logical dumps. One CR shape.</h2>
+        </div>
+        <div class="engine-grid">
+          <article>
+            <h3>PostgreSQL</h3>
+            <p><code>pg_dump</code> in, <code>pgrestore</code> out. Defaults to CloudNativePG PostgreSQL 18.4. Optional pgAudit DDL strip on restore.</p>
+          </article>
+          <article>
+            <h3>MariaDB</h3>
+            <p><code>mysqldump</code> with utf8mb4 / hex-blob. Restore recreates the schema and strips GTID/DEFINER noise.</p>
+          </article>
+          <article>
+            <h3>Redis</h3>
+            <p><code>redis-cli --rdb</code> on backup. Restore loads an ephemeral <code>redis-server</code> and <code>REPLICAOF</code> into the target.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="traits">
+        <div class="section-head">
+          <p class="eyebrow">In production</p>
+          <h2>Webhooks, metrics, Helm — not a sidecar script.</h2>
+        </div>
+        <ul class="trait-list">
+          <li>
+            <h3>Validating webhooks</h3>
+            <p>Reject bad cron, missing engine secrets, and incomplete specs before they land.</p>
+          </li>
+          <li>
+            <h3>Prometheus + Grafana</h3>
+            <p>Per-CR ready/suspend, last success, last-job failure and duration. Optional ServiceMonitor, PrometheusRule, dashboard ConfigMap.</p>
+          </li>
+          <li>
+            <h3>Retention both ways</h3>
+            <p>S3 object retention and local encrypted dumps on the PVC. Persistence can be swapped for emptyDir.</p>
+          </li>
+          <li>
+            <h3>Manual runs</h3>
+            <p>Keep the CronJob, suspend the schedule, then <code>kubectl create job --from=…</code> when you mean it.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="install" id="install">
+        <div class="section-head">
+          <p class="eyebrow">Install</p>
+          <h2>Helm from GHCR.</h2>
+          <p>
+            Current chart: <strong id="ver">0.0.10-p.5</strong>.
+            Images publish to <code>ghcr.io/mahdidarabi/karkive</code>; charts to
+            <code>oci://ghcr.io/mahdidarabi/charts/karkive</code>.
+          </p>
+        </div>
+        <div class="code-wrap">
+          <div class="code-bar">
+            <span>helm</span>
+            <button type="button" class="copy" data-copy="#helm-install" aria-label="Copy Helm install">Copy</button>
+          </div>
+          <pre id="helm-install" tabindex="0"><code>helm install karkive oci://ghcr.io/mahdidarabi/charts/karkive \
+  --version 0.0.10-p.5 \
+  -n karkive-system --create-namespace</code></pre>
+        </div>
+        <p class="install-note">
+          Add <code>--set metrics.serviceMonitor.enabled=true</code> (and PrometheusRule / Grafana dashboard)
+          when you already run kube-prometheus. On GitOps, set
+          <code>webhook.certManager.enabled=true</code> so Helm does not regenerate the webhook CA every template.
+          Full knobs live in the
+          <a href="https://github.com/mahdidarabi/KArkive#install">README</a>.
+        </p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="foot-brand">
+        <strong>KArkive</strong>
+        <span>Kubernetes-native backup &amp; restore.</span>
+      </div>
+      <ul>
+        <li><a href="https://github.com/mahdidarabi/KArkive">GitHub</a></li>
+        <li><a href="https://github.com/mahdidarabi/KArkive#install">Docs</a></li>
+        <li><a href="https://github.com/mahdidarabi/KArkive/pkgs/container/karkive">GHCR</a></li>
+        <li><a href="https://karkive.ir">karkive.ir</a></li>
+      </ul>
+      <p class="legal">&copy; <span id="year"></span> KArkive</p>
+    </footer>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
