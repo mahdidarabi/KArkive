@@ -28,6 +28,7 @@
   let scrollTarget = null;
   let scrollEndHandler = null;
   let scrollUnlockTimer = null;
+  let activeLink = null;
 
   const setActiveSection = (section) => {
     navLinks.forEach((link) => {
@@ -35,7 +36,24 @@
       link.classList.toggle("active", isActive);
       if (isActive) link.setAttribute("aria-current", "location");
       else link.removeAttribute("aria-current");
+
+      if (isActive && activeLink !== link) {
+        activeLink = link;
+        const mobileNav = window.matchMedia("(max-width: 640px)").matches;
+        const nav = link.closest("nav");
+        const navIsScrollable = nav && nav.scrollWidth > nav.clientWidth;
+
+        if (mobileNav && navIsScrollable) {
+          link.scrollIntoView({
+            behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+            block: "nearest",
+            inline: "center",
+          });
+        }
+      }
     });
+
+    if (!section) activeLink = null;
   };
 
   const updateActiveSection = () => {

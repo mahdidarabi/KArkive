@@ -143,7 +143,7 @@ code {
   border-radius: 999px;
   color: var(--muted);
   text-decoration: none;
-  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+  transition: color 160ms ease;
 }
 
 .nav nav a:hover,
@@ -1099,6 +1099,39 @@ pre .s {
   }
 }
 
+@media (max-width: 760px) {
+  .nav {
+    align-items: center;
+    flex-wrap: wrap;
+    row-gap: 0.55rem;
+  }
+
+  .nav nav {
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 0.2rem;
+    overflow: visible;
+    padding-block: 0.15rem;
+  }
+
+  .nav nav a {
+    flex: 0 1 auto;
+    padding-inline: 0.35rem;
+    font-size: 0.8rem;
+  }
+
+  .nav nav a.gh {
+    min-width: auto;
+    gap: 0.25rem;
+  }
+
+  .gh-icon {
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+}
+
 @media (max-width: 640px) {
   .nav {
     align-items: flex-start;
@@ -1108,8 +1141,12 @@ pre .s {
   .nav nav {
     width: 100%;
     flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 0.55rem;
     overflow-x: auto;
-    padding-bottom: 0.15rem;
+    overflow-y: hidden;
+    padding: 0.55rem 0.15rem;
+    margin-block: -0.2rem;
     scrollbar-width: none;
   }
 
@@ -1119,6 +1156,8 @@ pre .s {
 
   .nav nav a {
     flex: 0 0 auto;
+    padding-inline: 0.55rem;
+    font-size: 0.92rem;
   }
 
   h1 {
@@ -1217,6 +1256,16 @@ body {
 
 .nav nav a {
   border-color: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav nav a:focus {
+  outline: none;
+}
+
+.nav nav a:focus-visible {
+  outline: 2px solid rgba(240, 217, 160, 0.78);
+  outline-offset: 2px;
 }
 
 .nav nav a.gh {
@@ -1399,4 +1448,51 @@ body {
   .dash-stat:hover {
     transform: translateY(-2px);
   }
+}
+
+@media (max-width: 640px) {
+  .nav nav a.active {
+    box-shadow:
+      0 2px 8px rgba(212, 176, 106, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  .btn {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      0 5px 14px rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-primary {
+    box-shadow:
+      0 6px 16px rgba(212, 176, 106, 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  .flow-main li,
+  .stages article,
+  .engine-grid article,
+  .trait-list li,
+  .code-wrap,
+  .dash-stat,
+  .dash-card,
+  .dash-table,
+  .install-card {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 8px 20px rgba(0, 0, 0, 0.22);
+  }
+
+  .dashboard {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 12px 28px rgba(0, 0, 0, 0.26);
+  }
+}
+
+.nav nav a.active,
+.nav nav a.active:hover,
+.btn,
+.btn-primary {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
