@@ -1,11 +1,11 @@
 # KArkive
 
 [![Website](https://img.shields.io/badge/website-karkive.ir-c4a35a)](https://karkive.ir)
-[![CI](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml/badge.svg)](https://github.com/mahdidarabi/KArkive/actions/workflows/ci.yaml)
-[![Helm](https://img.shields.io/badge/Helm-0.0.10--p.5-0F1689?logo=helm)](https://github.com/mahdidarabi/KArkive/pkgs/container/charts%2Fkarkive)
-[![Image](https://img.shields.io/badge/GHCR-karkive-blue?logo=github)](https://github.com/mahdidarabi/KArkive/pkgs/container/karkive)
+[![CI](https://github.com/mahdidarabi/karkive/actions/workflows/ci.yaml/badge.svg)](https://github.com/mahdidarabi/karkive/actions/workflows/ci.yaml)
+[![Helm](https://img.shields.io/badge/Helm-0.0.10--p.5-0F1689?logo=helm)](https://github.com/mahdidarabi/karkive/pkgs/container/charts%2Fkarkive)
+[![Image](https://img.shields.io/badge/GHCR-karkive-blue?logo=github)](https://github.com/mahdidarabi/karkive/pkgs/container/karkive)
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](https://go.dev/)
-[![Kubebuilder](https://img.shields.io/badge/API-karkive.io%2Fv1alpha1-326CE5?logo=kubernetes)](https://github.com/mahdidarabi/KArkive/tree/main/api/v1alpha1)
+[![Kubebuilder](https://img.shields.io/badge/API-karkive.io%2Fv1alpha1-326CE5?logo=kubernetes)](https://github.com/mahdidarabi/karkive/tree/main/api/v1alpha1)
 
 Site: **[karkive.ir](https://karkive.ir)**
 
