@@ -354,6 +354,33 @@
           </p>
           <a href="https://github.com/mahdidarabi/karkive/blob/main/charts/karkive/dashboards/karkive.json">View dashboard JSON ↗</a>
         </div>
+
+        <div class="grafana-setup">
+          <div class="grafana-setup-head">
+            <p class="eyebrow">Grafana setup</p>
+            <h3>Connect the dashboard in three steps.</h3>
+          </div>
+          <ol class="setup-steps">
+            <li>
+              <strong><span>01</span> Scrape KArkive</strong>
+              <p>Use the Prometheus Operator integration or scrape the metrics Service at <code>/metrics</code> on port <code>8080</code>.</p>
+            </li>
+            <li>
+              <strong><span>02</span> Add the dashboard</strong>
+              <p>Enable the Grafana sidecar, or import <code>karkive.json</code> manually and select your Prometheus datasource.</p>
+            </li>
+            <li>
+              <strong><span>03</span> Keep the filters</strong>
+              <p>The dashboard uses <code>$namespace</code>, <code>$engine</code>, and a <code>30s</code> refresh to follow every CR.</p>
+            </li>
+          </ol>
+          <p class="grafana-hint">
+            Helm switches:
+            <code>metrics.serviceMonitor.enabled=true</code>
+            <code>metrics.grafanaDashboard.enabled=true</code>
+            <span>Default dashboard label: <code>grafana_dashboard: "1"</code>.</span>
+          </p>
+        </div>
       </section>
 
       <section class="install" id="install">
@@ -382,6 +409,45 @@
           Full knobs live in the
           <a href="https://github.com/mahdidarabi/karkive#install">README</a>.
         </p>
+        <div class="install-details">
+          <article class="install-card">
+            <span class="install-number">01</span>
+            <h3>Before you start</h3>
+            <ul>
+              <li>Helm 3 with OCI registry support</li>
+              <li>A kubeconfig with permission to install CRDs</li>
+              <li>Existing cert-manager only when webhook certificates use it</li>
+              <li>Prometheus Operator is optional for ServiceMonitor and alerts</li>
+            </ul>
+          </article>
+          <article class="install-card">
+            <span class="install-number">02</span>
+            <h3>Enable observability</h3>
+            <p>Turn on the integrations when kube-prometheus is already installed:</p>
+            <div class="code-wrap compact-code">
+              <pre><code>helm upgrade --install karkive \
+  oci://ghcr.io/mahdidarabi/charts/karkive \
+  -n karkive-system --create-namespace \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.prometheusRule.enabled=true \
+  --set metrics.grafanaDashboard.enabled=true</code></pre>
+            </div>
+          </article>
+          <article class="install-card">
+            <span class="install-number">03</span>
+            <h3>Verify and declare</h3>
+            <div class="code-wrap compact-code">
+              <pre><code>kubectl get deploy,svc -n karkive-system
+kubectl get crd backups.karkive.io \
+  restores.karkive.io
+
+# Then apply a Secret and a Backup CR
+kubectl apply -f config/samples/backup-secret.yaml
+kubectl apply -f config/samples/karkive_v1alpha1_backup.yaml</code></pre>
+            </div>
+            <p>Update the sample endpoint and credentials before applying it to a real cluster.</p>
+          </article>
+        </div>
       </section>
     </main>
 
