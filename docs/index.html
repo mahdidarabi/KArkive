@@ -64,6 +64,7 @@
       <nav aria-label="Primary">
         <a href="#how">How it works</a>
         <a href="#engines">Engines</a>
+        <a href="#monitoring">Monitoring</a>
         <a href="#install">Install</a>
         <a class="gh" href="https://github.com/mahdidarabi/KArkive">GitHub</a>
       </nav>
@@ -249,6 +250,99 @@
             <p>Keep the CronJob, suspend the schedule, then <code>kubectl create job --from=…</code> when you mean it.</p>
           </li>
         </ul>
+      </section>
+
+      <section class="monitoring" id="monitoring">
+        <div class="section-head">
+          <p class="eyebrow">Observability</p>
+          <h2>Know the state of every archive.</h2>
+          <p>
+            KArkive exposes Prometheus metrics per namespace, name, and engine. The Helm
+            chart can install a ServiceMonitor, alert rules, and this ready-to-import Grafana dashboard.
+          </p>
+        </div>
+
+        <div class="dashboard" aria-label="Preview of the KArkive Grafana dashboard">
+          <div class="dashboard-head">
+            <div>
+              <span class="dash-kicker">Dashboards / KArkive</span>
+              <strong>Backup &amp; restore overview</strong>
+            </div>
+            <div class="dash-controls">
+              <span class="dash-select">All namespaces <b>⌄</b></span>
+              <span class="dash-select">All engines <b>⌄</b></span>
+              <span class="dash-time">Last 24 hours</span>
+            </div>
+          </div>
+
+          <div class="dash-stats">
+            <article class="dash-stat">
+              <span>Backups ready</span>
+              <strong>12 <small>/ 12</small></strong>
+              <i class="good">● synced</i>
+            </article>
+            <article class="dash-stat">
+              <span>Restores ready</span>
+              <strong>3 <small>/ 3</small></strong>
+              <i class="good">● synced</i>
+            </article>
+            <article class="dash-stat">
+              <span>Last job failed</span>
+              <strong>0</strong>
+              <i class="good">● healthy</i>
+            </article>
+            <article class="dash-stat">
+              <span>Stale backups</span>
+              <strong>0</strong>
+              <i class="good">● within policy</i>
+            </article>
+            <article class="dash-stat">
+              <span>Suspended</span>
+              <strong>2</strong>
+              <i class="paused">● paused by spec</i>
+            </article>
+          </div>
+
+          <div class="dash-charts">
+            <article class="dash-card">
+              <div class="dash-card-head"><span>Last job duration</span><small>seconds</small></div>
+              <svg class="chart" viewBox="0 0 520 148" role="img" aria-label="Backup job duration trend">
+                <path class="grid-line" d="M0 22H520M0 58H520M0 94H520M0 130H520"/>
+                <path class="chart-fill" d="M0 111 C35 108 42 91 72 98 S110 84 140 91 S178 66 205 79 S243 67 270 75 S305 42 336 59 S370 54 402 61 S440 24 466 42 S498 25 520 32 V148H0Z"/>
+                <path class="chart-line" d="M0 111 C35 108 42 91 72 98 S110 84 140 91 S178 66 205 79 S243 67 270 75 S305 42 336 59 S370 54 402 61 S440 24 466 42 S498 25 520 32"/>
+                <text x="4" y="145">00:00</text><text x="245" y="145">12:00</text><text x="485" y="145">now</text>
+              </svg>
+              <div class="chart-legend"><span><i class="legend-brass"></i>Backup</span><span><i class="legend-blue"></i>Restore</span><b>max 74s</b></div>
+            </article>
+            <article class="dash-card">
+              <div class="dash-card-head"><span>Time since last success</span><small>hours</small></div>
+              <svg class="chart" viewBox="0 0 520 148" role="img" aria-label="Time since last successful backup trend">
+                <path class="grid-line" d="M0 22H520M0 58H520M0 94H520M0 130H520"/>
+                <path class="threshold" d="M0 76H520"/>
+                <path class="chart-fill blue-fill" d="M0 112 C36 108 54 105 85 99 S140 88 170 94 S216 76 250 84 S294 62 324 74 S365 55 394 63 S442 49 470 56 S500 37 520 44 V148H0Z"/>
+                <path class="chart-line blue-line" d="M0 112 C36 108 54 105 85 99 S140 88 170 94 S216 76 250 84 S294 62 324 74 S365 55 394 63 S442 49 470 56 S500 37 520 44"/>
+                <text x="4" y="145">00:00</text><text x="245" y="145">12:00</text><text x="485" y="145">now</text>
+              </svg>
+              <div class="chart-legend"><span><i class="legend-blue"></i>Oldest success</span><span class="threshold-key">36h stale alert</span><b>18h 24m</b></div>
+            </article>
+          </div>
+
+          <div class="dash-table">
+            <div class="dash-card-head"><span>Last job</span><small>live from Prometheus</small></div>
+            <div class="job-row job-labels"><span>Kind / Name</span><span>Engine</span><span>Outcome</span><span>Duration</span><span>Success age</span></div>
+            <div class="job-row"><span><b>Backup</b> · app-postgres</span><span>postgres</span><span class="status success">Succeeded</span><span>42s</span><span>2h 14m</span></div>
+            <div class="job-row"><span><b>Backup</b> · cache-redis</span><span>redis</span><span class="status success">Succeeded</span><span>8s</span><span>5h 02m</span></div>
+            <div class="job-row"><span><b>Restore</b> · staging-db</span><span>mariadb</span><span class="status success">Succeeded</span><span>61s</span><span>19h 41m</span></div>
+          </div>
+        </div>
+
+        <div class="monitoring-foot">
+          <p>
+            <strong>Included alert coverage:</strong> not Ready, failed Job, aging or stale Backup,
+            no finished Job, and missed CronJob schedule.
+          </p>
+          <a href="https://github.com/mahdidarabi/KArkive/blob/main/charts/karkive/dashboards/karkive.json">View dashboard JSON ↗</a>
+        </div>
       </section>
 
       <section class="install" id="install">
