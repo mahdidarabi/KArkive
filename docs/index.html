@@ -10,11 +10,15 @@
     />
     <link rel="canonical" href="https://karkive.ir/" />
     <script>
-      document.head.prepend(
-        Object.assign(document.createElement("base"), {
-          href: /\.github\.io$/i.test(location.hostname) ? "/karkive/" : "/",
-        })
-      );
+      (function () {
+        var host = location.hostname.toLowerCase();
+        var custom = host === "karkive.ir" || host === "www.karkive.ir";
+        document.head.prepend(
+          Object.assign(document.createElement("base"), {
+            href: custom || !/\.github\.io$/.test(host) ? "/" : "/karkive/",
+          })
+        );
+      })();
     </script>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <meta name="theme-color" content="#08090c" />
